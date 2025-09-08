@@ -13,8 +13,8 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@repo/db": "*",
-    "@repo/typescript-config": "*",
+    "@repo/db": "workspace:*",
+    "@repo/typescript-config": "workspace:*",
     "@trpc/client": "^11.5.1",
     "@trpc/server": "^11.5.1",
     "cors": "^2.8.5",
