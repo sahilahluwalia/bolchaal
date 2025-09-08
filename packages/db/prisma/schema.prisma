@@ -8,18 +8,113 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id    Int     @id @default(autoincrement())
-  email String  @unique
-  name  String?
-  posts Post[]
+enum UserRole {
+  ADMIN
+  TEACHER
+  STUDENT
 }
 
-model Post {
-  id        Int     @id @default(autoincrement())
-  title     String
-  content   String?
-  published Boolean @default(false)
-  authorId  Int
-  author    User    @relation(fields: [authorId], references: [id])
+enum MessageType {
+  TEXT
+  AUDIO
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      UserRole @default(TEACHER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classrooms       Classroom[]        @relation("TeacherClassrooms")
+  enrolledStudents StudentClassroom[]
+  messages     Message[]
+  rubrics          Rubric[]
+
+  @@map("users")
+}
+
+model Classroom {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  teacherId   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  teacher     User               @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
+  rubrics     Rubric[]
+  enrollments StudentClassroom[]
+  messages    Message[]
+
+  @@map("classrooms")
+}
+
+model Rubric {
+  id          String   @id @default(uuid())
+  title       String
+  teacherId   String
+  classroomId String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  teacher   User      @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@map("rubrics")
+}
+
+model StudentClassroom {
+  id          String   @id @default(uuid())
+  studentId   String
+  classroomId String
+  enrolledAt  DateTime @default(now())
+
+  student   User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@map("student-classroom")
+}
+
+model Message {
+  id          String      @id @default(uuid())
+  content     String
+  messageType MessageType @default(TEXT)
+  senderId    String
+  classroomId String
+  isBot       Boolean     @default(false)
+  aiResponse  String?
+  createdAt   DateTime    @default(now())
+  sender      User        @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  classroom   Classroom   @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+model Invitation {
+  id          String           @id @default(uuid())
+  token       String           @unique // Unique URL token (like "abc123def")
+  email       String // Email of invited student
+  classroomId String // Which class they're invited to
+  invitedById String // Which teacher sent invitation
+  recipientId String? // Student who accepted (null until accepted)
+  status      InvitationStatus @default(PENDING)
+  expiresAt   DateTime // When invitation expires
+  createdAt   DateTime         @default(now())
+  acceptedAt  DateTime? // When student accepted
+
+  // classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  // invitedBy   User      @relation(fields: [invitedById], references: [id], onDelete: Cascade)
+  // recipient   User?     @relation("InvitationRecipient", fields: [recipientId], references: [id])
+
+  @@map("invitations")
 }
