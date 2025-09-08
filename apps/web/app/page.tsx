@@ -1,8 +1,18 @@
+"use client";
+
 import Link from "next/link";
+import { useRef } from "react";
+import { Navbar } from "./components/navbar";
 
 export default function Page() {
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // No scrolling needed - all content is visible
+
   return (
-    <main className="min-h-screen bg-white text-gray-900">
+    <>
+      <Navbar />
+      <main className="min-h-screen bg-white text-gray-900 pt-16">
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none opacity-10">
@@ -26,6 +36,11 @@ export default function Page() {
               <p className="mt-5 max-w-prose text-base sm:text-lg text-gray-600">
                 Students practice English through chat and audio with an adaptive bot. Teachers create classrooms and rubrics, and the bot evaluates, coaches, and tracks progress in real time.
               </p>
+              <div className="mt-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200">
+                <p className="text-sm font-medium text-emerald-800">
+                  📋 Rubric: <span className="font-bold">Fluency, Pronunciation, Vocabulary</span> — Bot will assess each message.
+                </p>
+              </div>
               <div className="mt-8 flex flex-col sm:flex-row gap-3">
                 <Link href="/auth/sign-up" className="inline-flex items-center justify-center rounded-md bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600">
                   Get started free
@@ -42,28 +57,92 @@ export default function Page() {
             </div>
             <div className="lg:pl-8">
               <div className="relative rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 shadow-sm">
-                <div className="aspect-[4/3] w-full overflow-hidden rounded-xl bg-gray-50">
-                  <div className="p-4 sm:p-6">
-                    <div className="space-y-3 text-sm">
-                      <div className="flex items-start gap-3">
-                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white">S</span>
-                        <div>
-                          <p className="font-semibold">Student</p>
-                          <p className="text-gray-600">Hi! I want to practice ordering food.</p>
+                <div className="aspect-[5/4] w-full overflow-hidden rounded-xl bg-gray-50">
+                  <div className="p-2 sm:p-4">
+                    <div className="space-y-4 text-sm h-[42rem] chat-container" ref={chatContainerRef}>
+                      <div className="flex items-start gap-3 chat-message opacity-0">
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white font-semibold">S</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900">Student</p>
+                          <div className="mt-1 p-3 rounded-lg bg-indigo-50 text-gray-700 message-bubble">
+                            Hi! I want to practice ordering food at a restaurant.
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-600 text-white">🤖</span>
-                        <div>
-                          <p className="font-semibold">Coach Bot</p>
-                          <p className="text-gray-600">Great! Let’s role‑play at a cafe. I’ll give feedback based on your classroom rubric.</p>
+                      <div className="flex items-start gap-3 chat-message opacity-0">
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-600 text-white font-semibold">🤖</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900">Coach Bot</p>
+                          <div className="mt-1 p-3 rounded-lg bg-sky-50 text-gray-700 message-bubble">
+                            Great! Let&apos;s role-play at a cafe. I&apos;ll give feedback based on your classroom rubric.
+                          </div>
+                          <div className="mt-2 text-xs text-green-600 font-medium">
+                            ✓ Fluency: Good sentence structure
+                          </div>
                         </div>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-white">T</span>
-                        <div>
-                          <p className="font-semibold">Teacher</p>
-                          <p className="text-gray-600">Rubric: Fluency, Pronunciation, Vocabulary. Bot will assess each message.</p>
+                      <div className="flex items-start gap-3 chat-message opacity-0">
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white font-semibold">S</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900">Student</p>
+                          <div className="mt-1 p-3 rounded-lg bg-indigo-50 text-gray-700 message-bubble">
+                            Hello, I would like a coffee and sandwich please.
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 chat-message opacity-0">
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-600 text-white font-semibold">🤖</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900">Coach Bot</p>
+                          <div className="mt-1 p-3 rounded-lg bg-sky-50 text-gray-700 message-bubble">
+                            Good job! That&apos;s polite and clear. You could also say &ldquo;May I have...&rdquo; for more formality.
+                          </div>
+                          <div className="mt-2 space-y-1">
+                            <div className="text-xs text-green-600 font-medium">
+                              ✓ Pronunciation: Clear enunciation
+                            </div>
+                            <div className="text-xs text-blue-600 font-medium">
+                              ✓ Vocabulary: Good word choice
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 chat-message opacity-0">
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white font-semibold">S</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900">Student</p>
+                          <div className="mt-1 p-3 rounded-lg bg-indigo-50 text-gray-700 message-bubble">
+                            May I have a cappuccino and a tuna sandwich?
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 chat-message opacity-0">
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-600 text-white font-semibold">🤖</span>
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-900">Coach Bot</p>
+                          <div className="mt-1 p-3 rounded-lg bg-sky-50 text-gray-700 message-bubble">
+                            Perfect! That&apos;s much more natural. Well done!
+                          </div>
+                          <div className="mt-2 space-y-1">
+                            <div className="text-xs text-green-600 font-medium">
+                              ✓ Fluency: Natural phrasing
+                            </div>
+                            <div className="text-xs text-green-600 font-medium">
+                              ✓ Vocabulary: Appropriate level
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3 chat-message opacity-0" style={{ animationDelay: '3.8s' }}>
+                        <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-600 text-white font-semibold">🤖</span>
+                        <div className="flex-1">
+                          <div className="mt-1 p-3 rounded-lg bg-sky-50 text-gray-700 message-bubble">
+                            <div className="typing-indicator">
+                              <span></span>
+                              <span></span>
+                              <span></span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -168,5 +247,6 @@ export default function Page() {
         </div>
       </footer>
     </main>
+    </>
   );
 }

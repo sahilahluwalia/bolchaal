@@ -11,7 +11,7 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const baseStyles =
-  "ui:inline-flex ui:items-center ui:justify-center ui:rounded-md ui:font-medium ui:transition-colors focus:ui:outline-none focus:ui:ring-2 focus:ui:ring-offset-2 ui:disabled:opacity-50 ui:disabled:cursor-not-allowed";
+  "ui:inline-flex ui:items-center ui:justify-center ui:rounded-md ui:font-medium ui:transition-colors ui:cursor-pointer focus:ui:outline-none focus:ui:ring-2 focus:ui:ring-offset-2 ui:disabled:opacity-50 ui:disabled:cursor-not-allowed";
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
