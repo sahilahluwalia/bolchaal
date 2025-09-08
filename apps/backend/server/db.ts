@@ -1,3 +1,6 @@
+import { prismaClient } from "@repo/db/client"
+
+
 type User = { id: string; name: string };
  
 // Imaginary database

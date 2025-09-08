@@ -1,5 +1,5 @@
 {
-  "extends":"@repo/typescript-config/backends.json",
+  "extends":"@repo/typescript-config/base.json",
   "compilerOptions": {
     "rootDir": "./",                                  /* Specify the root folder within your source files. */
     "outDir": "./dist",                                   /* Specify an output folder for all emitted files. */

@@ -36,7 +36,7 @@ model User {
 
   classrooms       Classroom[]        @relation("TeacherClassrooms")
   enrolledStudents StudentClassroom[]
-  messages     Message[]
+  messages         Message[]
   rubrics          Rubric[]
 
   @@map("users")
