@@ -1,7 +1,6 @@
 import { jwtVerify ,SignJWT} from "jose";
 // console.log(process.env)
 interface UserJwtPayload {
-  id: string;
 
   //standard
   jti: string;
@@ -15,6 +14,7 @@ export const verifyToken = async (token: string) => {
       token,
       new TextEncoder().encode(process.env.JWT_SECRET)
     );
+    console.log('verified',verified)
     return verified.payload as any as UserJwtPayload;
   } catch (error) {
     throw new Error("Your Token has expired");

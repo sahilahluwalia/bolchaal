@@ -6,11 +6,10 @@ import {
 } from "./trpc";
 import { createHTTPServer } from "@trpc/server/adapters/standalone";
 import { z } from "zod";
-import { db } from "./db";
 import { systemPrompt } from "../utils/prompt";
 import { prismaClient } from "@repo/db/client";
 import { TRPCError } from "@trpc/server";
-import { generateToken } from "../utils/auth";
+import { generateToken } from "../utils/auth";  
 import 'dotenv/config'
 
 export const appRouter = router({
@@ -106,13 +105,17 @@ export const appRouter = router({
       // TODO: Implement sign in logic
       return { message: "Sign in successful" ,token};
     }),
+    toDo:publicProcedure.query(async () => {
+      return [1,2,3]
+    }),
 });
 
 const server = createHTTPServer({
   router: appRouter,
-  createContext: (opts) => {
-    return createTRPCContext(opts);
-  },
+  createContext: createTRPCContext,
+  // createContext: (opts) => {
+  //   return createTRPCContext(opts);
+  // },
 });
 
 server.listen(3005, () => {

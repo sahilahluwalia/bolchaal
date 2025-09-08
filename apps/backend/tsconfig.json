@@ -2,6 +2,12 @@
   "extends":"@repo/typescript-config/base.json",
   "compilerOptions": {
     "rootDir": "./",                                  /* Specify the root folder within your source files. */
-    "outDir": "./dist",                                   /* Specify an output folder for all emitted files. */
+    "outDir": "./dist",
+    "allowImportingTsExtensions": true,
+    "noEmit": true       ,
+    "esModuleInterop": true,
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022"                            /* Specify an output folder for all emitted files. */
   }
 }
