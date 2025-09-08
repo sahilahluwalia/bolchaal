@@ -12,7 +12,7 @@ export const Provider = ({ children }: { children: React.ReactNode }) => {
     const [trpcClient] = useState(() => trpc.createClient({
         links: [
             httpBatchLink({
-                url: 'http://localhost:3000/api/trpc',
+                url: 'http://localhost:3005',
             }),
         ],
     }));
