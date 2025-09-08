@@ -2,7 +2,8 @@ import "@repo/ui/styles.css";
 import "./globals.css";
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-
+import { Provider } from "./_trpc/Provider";
+ 
 const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -17,7 +18,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={geist.className}>{children}</body>
+      <body className={geist.className}>
+        <Provider>
+        <>{children}</>
+        </Provider>
+      </body>
     </html>
   );
 }

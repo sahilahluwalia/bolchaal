@@ -11,7 +11,11 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@repo/backend": "workspace:*",
     "@repo/ui": "workspace:*",
+    "@tanstack/react-query": "^5.87.1",
+    "@trpc/client": "^11.5.1",
+    "@trpc/react-query": "^11.5.1",
     "next": "^15.4.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
