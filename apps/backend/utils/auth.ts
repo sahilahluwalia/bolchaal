@@ -1,7 +1,8 @@
+// @ts-nocheck because of jose don't have types
 import { jwtVerify ,SignJWT} from "jose";
 // console.log(process.env)
 interface UserJwtPayload {
-
+  id : string;
   //standard
   jti: string;
   iat: number;
