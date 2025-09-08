@@ -12,7 +12,7 @@ import { TRPCError } from "@trpc/server";
 import { generateToken } from "../utils/auth";  
 import 'dotenv/config'
 
-export const appRouter = router({
+export const appRouter: ReturnType<typeof router> = router({
   hello: publicProcedure.query(() => {
     return { message: "Hello World" };
   }),
@@ -22,18 +22,41 @@ export const appRouter = router({
   signUp: publicProcedure
     .input(
       z.object({
-        email: z.string(),
-        password: z.string(),
+        email: z.string().email("Invalid email format"),
+        password: z.string().min(6, "Password must be at least 6 characters"),
+        name: z.string().optional(),
       })
     )
     .mutation(async (opts) => {
       const {
-        input: { email, password },
+        input: { email, password, name },
       } = opts;
-      
-     
+
+      // Check if user already exists
+      const existingUser = await prismaClient.user.findUnique({
+        where: { email },
+      });
+
+      if (existingUser) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "User with this email already exists",
+        });
+      }
+
       const result = await prismaClient.user.create({
-        data: { email, password },
+        data: {
+          email,
+          password, // TODO: Hash password before storing
+          ...(name && { name }),
+        },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          role: true,
+          createdAt: true,
+        },
       });
 // "result": {
 //                 "id": "ec588a2e-a23f-4b5e-8f7c-bd6cd37d1ae7",
