@@ -25,6 +25,12 @@ enum InvitationStatus {
   EXPIRED
 }
 
+enum ChatSessionStatus {
+  ACTIVE
+  ARCHIVED
+  COMPLETED
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -34,10 +40,14 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  classrooms       Classroom[]        @relation("TeacherClassrooms")
-  enrolledStudents StudentClassroom[]
-  messages         Message[]
-  rubrics          Rubric[]
+  classrooms          Classroom[]        @relation("TeacherClassrooms")
+  enrollments         StudentClassroom[]
+  messages            Message[]
+  rubrics             Rubric[]
+  lessons             Lesson[]
+  sentInvitations     Invitation[]       @relation("SentInvitations")
+  receivedInvitations Invitation[]       @relation("InvitationRecipient")
+  chatSessions        ChatSession[]
 
   @@map("users")
 }
@@ -50,12 +60,52 @@ model Classroom {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  teacher     User               @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
-  rubrics     Rubric[]
-  enrollments StudentClassroom[]
-  messages    Message[]
+  teacher         User               @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
+  rubrics         Rubric[]
+  enrollments     StudentClassroom[]
+  ClassroomLesson ClassroomLesson[]
+  ChatSession     ChatSession[]
+  Message         Message[]
+  Invitation      Invitation[]
 
   @@map("classrooms")
+}
+
+model Lesson {
+  id                         String   @id @default(uuid())
+  title                      String
+  teacherId                  String
+  purpose                    String
+  speakingModeOnly           Boolean  @default(false)
+  keyVocabulary              String
+  keyGrammar                 String
+  studentTask                String
+  reminderMessage            String
+  autoCheckIfLessonCompleted Boolean  @default(false)
+  otherInstructions          String
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  teacher          User              @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  classroomLessons ClassroomLesson[]
+
+  @@map("lessons")
+}
+
+model ClassroomLesson {
+  id          String  @id @default(uuid())
+  classroomId String
+  lessonId    String
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  lesson    Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, lessonId])
+  @@map("classroom-lessons")
 }
 
 model Rubric {
@@ -79,23 +129,70 @@ model StudentClassroom {
   classroomId String
   enrolledAt  DateTime @default(now())
 
-  student   User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  student      User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classroom    Classroom     @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  chatSessions ChatSession[]
 
+  @@unique([studentId, classroomId])
   @@map("student-classroom")
 }
 
-model Message {
-  id          String      @id @default(uuid())
-  content     String
-  messageType MessageType @default(TEXT)
-  senderId    String
+model ChatSession {
+  id          String            @id @default(uuid())
+  studentId   String
   classroomId String
-  isBot       Boolean     @default(false)
-  aiResponse  String?
-  createdAt   DateTime    @default(now())
-  sender      User        @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  classroom   Classroom   @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  status      ChatSessionStatus @default(ACTIVE)
+  startedAt   DateTime          @default(now())
+  endedAt     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student            User              @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classroom          Classroom         @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  messages           Message[]
+  StudentClassroom   StudentClassroom? @relation(fields: [studentClassroomId], references: [id])
+  studentClassroomId String?
+
+  @@unique([studentId, classroomId])
+  @@index([studentId])
+  @@index([classroomId])
+  @@map("chat-sessions")
+}
+
+model MessageAttachment {
+  id              String   @id @default(uuid())
+  messageId       String
+  url             String
+  mimeType        String?
+  sizeBytes       Int?
+  durationSeconds Int? // for audio
+  createdAt       DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId])
+  @@map("message-attachment")
+}
+
+model Message {
+  id            String      @id @default(uuid())
+  content       String?
+  messageType   MessageType @default(TEXT)
+  attachmentId  String?
+  senderId      String?
+  chatSessionId String
+  classroomId   String
+  isBot         Boolean     @default(false)
+  aiPrompt      String?
+  aiResponse    String?
+  aiMetadata    Json?
+  createdAt     DateTime    @default(now())
+
+  sender      User?              @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  classroom   Classroom          @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  chatSession ChatSession        @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+  attachment  MessageAttachment?
 
   @@map("messages")
 }
@@ -112,9 +209,9 @@ model Invitation {
   createdAt   DateTime         @default(now())
   acceptedAt  DateTime? // When student accepted
 
-  // classroom   Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  // invitedBy   User      @relation(fields: [invitedById], references: [id], onDelete: Cascade)
-  // recipient   User?     @relation("InvitationRecipient", fields: [recipientId], references: [id])
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation("SentInvitations", fields: [invitedById], references: [id], onDelete: Cascade)
+  recipient User?     @relation("InvitationRecipient", fields: [recipientId], references: [id])
 
   @@map("invitations")
 }
