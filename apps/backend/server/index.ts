@@ -6,12 +6,23 @@ import {
 } from "./trpc";
 import { createHTTPServer } from "@trpc/server/adapters/standalone";
 import { z } from "zod";
-import { systemPrompt } from "../utils/prompt";
-import { prismaClient } from "@repo/db/client";
+import { Prompts, systemPrompt } from "../utils/prompt";
+import {
+  LessonCreateInputObjectSchema,
+  prismaClient,
+  LessonCreateInputObjectZodSchema,
+  LessonResultSchema,
+} from "@repo/db/client";
 import { TRPCError } from "@trpc/server";
-import { generateToken } from "../utils/auth";  
-import 'dotenv/config'
-import cors from 'cors';
+import { generateToken } from "../utils/auth";
+import "dotenv/config";
+import cors from "cors";
+import { generateText, generateObject } from "ai";
+
+// console.log(process.env.OPENAI_API_KEY)
+
+
+
 
 export const appRouter = router({
   hello: publicProcedure.query(() => {
@@ -52,17 +63,17 @@ export const appRouter = router({
           ...(name && { name }),
         },
       });
-// "result": {
-//                 "id": "ec588a2e-a23f-4b5e-8f7c-bd6cd37d1ae7",
-//                 "email": "sahil@gmail.com",
-//                 "password": "123",
-//                 "name": null,
-//                 "role": "TEACHER",
-//                 "createdAt": "2025-09-08T09:59:16.836Z",
-//                 "updatedAt": "2025-09-08T09:59:16.836Z"
-//             }   
-      
-      const token=await generateToken(user.id)
+      // "result": {
+      //                 "id": "ec588a2e-a23f-4b5e-8f7c-bd6cd37d1ae7",
+      //                 "email": "sahil@gmail.com",
+      //                 "password": "123",
+      //                 "name": null,
+      //                 "role": "TEACHER",
+      //                 "createdAt": "2025-09-08T09:59:16.836Z",
+      //                 "updatedAt": "2025-09-08T09:59:16.836Z"
+      //             }
+
+      const token = await generateToken({ id: user.id, role: user.role });
       return { message: "Sign up successful", token };
     }),
   chat: publicProcedure
@@ -100,35 +111,274 @@ export const appRouter = router({
         email: z.string(),
         password: z.string(),
       })
-    ).output(z.object({
-      message: z.string(),
-      token: z.string(),
-      role: z.enum(["TEACHER", "STUDENT","ADMIN"]),
-    }))
-    .mutation(async (opts) => {
-      const { input:{
-        email,password
-      } } = opts;
-      const user= await prismaClient.user.findFirst({
-        select:{
-          id:true,
-          role:true,
-        },
-        where:{
-          email:email,
-          password:password,
-        }
+    )
+    .output(
+      z.object({
+        message: z.string(),
+        token: z.string(),
+        role: z.enum(["TEACHER", "STUDENT", "ADMIN"]),
       })
-      console.log(user)
-      if(!user) throw new TRPCError({code:"UNAUTHORIZED",message:"Invalid email or password"})
-      const token=await generateToken(user.id)
+    )
+    .mutation(async (opts) => {
+      const {
+        input: { email, password },
+      } = opts;
+      const user = await prismaClient.user.findFirst({
+        select: {
+          id: true,
+          role: true,
+        },
+        where: {
+          email: email,
+          password: password,
+        },
+      });
+      console.log(user);
+      if (!user)
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Invalid email or password",
+        });
+      const token = await generateToken(user);
 
       // TODO: Implement sign in logic
-      return { message: "Sign in successful" ,token,role:user.role};
+      return { message: "Sign in successful", token, role: user.role };
     }),
-    toDo:publicProcedure.query(async () => {
-      return [1,2,3]
+  generateAILessonContent: publicProcedure
+    .input(
+      z.object({
+        title: z.string(),
+        purpose: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      const {
+        input: { title, purpose },
+      } = opts;
+      const lessonContentSchema = z.object({
+        keyVocabulary: z.string(),
+        keyGrammar: z.string(),
+        studentTask: z.string(),
+        reminderMessage: z.string(),
+        otherInstructions: z.string(),
+      });
+      const result = await generateObject({
+        model: "gpt-4.1-nano",
+        schema: lessonContentSchema,
+        system: Prompts.systemPrompt.AILessonContentPrompt,
+        messages: [
+          {
+            role: "user",
+            content: `Teacher's title: ${title}\nTeacher's purpose: ${purpose}`,
+          },
+        ],
+      });
+      return { lessonContent: result.object };
     }),
+  createLesson: privateProcedure
+    .input(LessonCreateInputObjectZodSchema.omit({
+      teacher: true,
+      classroomLessons: true,
+    }))
+    .mutation(async (opts) => {
+      const {
+        input: {
+          title,
+          purpose,
+          keyVocabulary,
+          keyGrammar,
+          studentTask,
+          reminderMessage,
+          otherInstructions,
+          speakingModeOnly,
+          autoCheckIfLessonCompleted,
+        },
+      } = opts;
+      try{
+
+      const lesson = await prismaClient.lesson.create({
+        data: {
+          title,
+          purpose,
+          keyVocabulary,
+          keyGrammar,
+          studentTask,
+          reminderMessage,
+          otherInstructions,
+          speakingModeOnly,
+          autoCheckIfLessonCompleted,
+          teacherId: opts.ctx.userId,
+        },
+      });
+      console.log(lesson);
+
+      return { id: lesson.id };
+
+      }catch(error){
+        console.log(error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create lesson",
+        });
+      }
+   
+    }),
+  getLessons: privateProcedure.query(async (opts) => {
+    try{
+      const lessons = await prismaClient.lesson.findMany({
+        where: {
+          teacherId: opts.ctx.userId,
+        },
+        // select: {
+          // id: true,
+          // title: true,
+          // purpose: true,
+          // speakingModeOnly: true,
+          // keyVocabulary: true,
+          // keyGrammar: true,
+          // studentTask: true,
+          // reminderMessage: true,
+          // otherInstructions: true,
+        // },
+        orderBy: {
+          createdAt: "desc",
+        },
+      });
+      console.log(lessons);
+      return lessons
+      }
+      catch(error){
+        console.log(error);
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to get lessons",
+        });
+      }
+
+  }),
+  getLesson: privateProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async (opts) => {
+      try {
+        const lesson = await prismaClient.lesson.findFirst({
+          where: {
+            id: opts.input.id,
+            teacherId: opts.ctx.userId, 
+          },
+        });
+
+        if (!lesson) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Lesson not found",
+          });
+        }
+
+        return lesson;
+      } catch (error) {
+        console.log(error);
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to get lesson",
+        });
+      }
+    }),
+  updateLesson: privateProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        title: z.string().min(1, "Title is required"),
+        purpose: z.string().min(1, "Purpose is required"),
+        speakingModeOnly: z.boolean(),
+        keyVocabulary: z.string(),
+        keyGrammar: z.string(),
+        studentTask: z.string(),
+        reminderMessage: z.string(),
+        autoCheckIfLessonCompleted: z.boolean(),
+        otherInstructions: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      try {
+        const {
+          id,
+          title,
+          purpose,
+          speakingModeOnly,
+          keyVocabulary,
+          keyGrammar,
+          studentTask,
+          reminderMessage,
+          autoCheckIfLessonCompleted,
+          otherInstructions,
+        } = opts.input;
+
+        const lesson = await prismaClient.lesson.update({
+          where: {
+            id,
+            teacherId: opts.ctx.userId, 
+          },
+          data: {
+            title,
+            purpose,
+            speakingModeOnly,
+            keyVocabulary,
+            keyGrammar,
+            studentTask,
+            reminderMessage,
+            autoCheckIfLessonCompleted,
+            otherInstructions,
+          },
+        });
+
+        return lesson;
+      } catch (error) {
+        console.log(error);
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to update lesson",
+        });
+      }
+    }),
+  deleteLesson: privateProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async (opts) => {
+      try {
+        const lesson = await prismaClient.lesson.findFirst({
+          where: {
+            id: opts.input.id,
+            teacherId: opts.ctx.userId, 
+          },
+        });
+
+        if (!lesson) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Lesson not found",
+          });
+        }
+
+        await prismaClient.lesson.delete({
+          where: {
+            id: opts.input.id,
+          },
+        });
+
+        return { success: true };
+      } catch (error) {
+        console.log(error);
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to delete lesson",
+        });
+      }
+    }),
+  toDo: publicProcedure.query(async () => {
+    return [1, 2, 3];
+  }),
 });
 
 const server = createHTTPServer({
