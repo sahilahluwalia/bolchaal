@@ -8,6 +8,7 @@ export function TeacherSummary() {
     totalStudents: 127,
     activeRubrics: 8,
     recentMessages: 23,
+    totalLessons: 12,
   };
 
   const recentActivity = [
@@ -20,20 +21,34 @@ export function TeacherSummary() {
     },
     {
       id: 2,
+      type: "lesson",
+      content: "Created new lesson 'Business Communication Skills'",
+      time: "10 minutes ago",
+      classroom: "Business English",
+    },
+    {
+      id: 3,
       type: "enrollment",
       content: "Bob joined Science Lab",
       time: "15 minutes ago",
       classroom: "Science Lab",
     },
     {
-      id: 3,
+      id: 4,
       type: "rubric",
       content: "Updated rubric for Physics Final",
       time: "1 hour ago",
       classroom: "Physics 101",
     },
     {
-      id: 4,
+      id: 5,
+      type: "lesson",
+      content: "Students completed 'Introduction to Grammar' lesson",
+      time: "1.5 hours ago",
+      classroom: "English 101",
+    },
+    {
+      id: 6,
       type: "message",
       content: "Carol submitted assignment in Chemistry",
       time: "2 hours ago",
@@ -51,13 +66,20 @@ export function TeacherSummary() {
     },
     {
       id: 2,
+      title: "Create Advanced Vocabulary Lesson",
+      classroom: "Advanced English",
+      dueDate: "Tomorrow",
+      priority: "medium",
+    },
+    {
+      id: 3,
       title: "Review Math Quiz Results",
       classroom: "Math 101",
       dueDate: "Tomorrow",
       priority: "medium",
     },
     {
-      id: 3,
+      id: 4,
       title: "Update Science Rubric",
       classroom: "Science Lab",
       dueDate: "Friday",
@@ -135,6 +157,22 @@ export function TeacherSummary() {
         <div className="bg-white border border-gray-200 rounded-lg p-4 md:p-6 hover:shadow-lg transition-all duration-200 hover:-translate-y-1">
           <div className="flex items-center">
             <div className="flex-shrink-0">
+              <div className="w-12 h-12 bg-cyan-100 rounded-xl flex items-center justify-center">
+                <svg className="w-6 h-6 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              </div>
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-500">Total Lessons</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.totalLessons}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-lg p-4 md:p-6 hover:shadow-lg transition-all duration-200 hover:-translate-y-1">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
               <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
                 <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -179,6 +217,11 @@ export function TeacherSummary() {
                     {activity.type === "rubric" && (
                       <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    )}
+                    {activity.type === "lesson" && (
+                      <svg className="w-5 h-5 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                       </svg>
                     )}
                   </div>
