@@ -2,9 +2,11 @@
 import { jwtVerify ,SignJWT} from "jose";
 // console.log(process.env)
 interface UserJwtPayload {
-  id : string;
+  sub: {
+    id: string;
+    role: UserRoleSchema;
+  };
   //standard
-  jti: string;
   iat: number;
   exp: number;
 }
@@ -22,10 +24,16 @@ export const verifyToken = async (token: string) => {
   }
 };
 
-export const generateToken = async (id: string) => {
+export const generateToken = async ({
+  id,
+  role,
+}: {
+  id: string;
+  role: UserRoleSchema;
+}) => {
     console.log(process.env.JWT_SECRET);
     const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-    const token = await new SignJWT({ sub: id })
+    const token = await new SignJWT({ sub: {id, role} })
       .setProtectedHeader({ alg: "HS256" })
       .setIssuedAt()
       .setExpirationTime("1h")

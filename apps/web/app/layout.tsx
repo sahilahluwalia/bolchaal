@@ -3,7 +3,8 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import { Provider } from "./_trpc/Provider";
- 
+import { Toaster } from "sonner";
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -112,7 +113,9 @@ export default function RootLayout({
       <body className={geist.className}>
         <Provider>
         <>{children}</>
+        <ReactQueryDevtools initialIsOpen={false} />
         </Provider>
+        <Toaster position="top-right" richColors />
       </body>
     </html>
   );

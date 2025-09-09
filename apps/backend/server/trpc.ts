@@ -22,11 +22,13 @@ const isAuthed = t.middleware(async ({ ctx, next }) => {
   const payload = await verifyToken(token);
   //   .log("middleware req recived");
   if (!payload) throw new TRPCError({ code: "UNAUTHORIZED" });
-
+  
   console.log("middleware passed");
   return next({
     ctx: {
-      userId: payload.id,
+      userId: payload.sub.id,
+      userRole: payload.sub.role,
+      // userRole: payload.role,
     },
   });
 });
