@@ -9,6 +9,7 @@ import { AuthFooter } from '../../components/auth-footer';
 import { DemoAccountBox } from '@repo/ui/demo-account-box';
 import { trpc } from '../../_trpc/client';
 import { TRPCClientError } from '@trpc/client';
+import { TokenManager } from '../../../utils/auth';
 
 interface FormData {
   email: string;
@@ -66,15 +67,14 @@ export default function SignInPage() {
     setErrors({});
 
     try {
-      const { token,role } = await signInMutation.mutateAsync({
+      const { accessToken, role } = await signInMutation.mutateAsync({
         email: formData.email.trim(),
         password: formData.password,
       });
 
-      // Persist token for subsequent requests (simple localStorage for now)
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('user-token', token);
-      }
+      // Store access token (refresh token is in HTTP cookie)
+      TokenManager.setAccessToken(accessToken);
+
       if(role === 'TEACHER'){
         router.push('/dashboard/teacher');
       }else{

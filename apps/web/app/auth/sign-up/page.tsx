@@ -8,6 +8,7 @@ import { TRPCClientError } from '@trpc/client';
 import { Button } from '@repo/ui/button';
 import { AuthFooter } from '../../components/auth-footer';
 import { DemoAccountBox } from '@repo/ui/demo-account-box';
+import { TokenManager } from '../../../utils/auth';
 
 interface FormData {
   name: string;
@@ -89,14 +90,15 @@ export default function SignUpPage() {
     setErrors({});
 
     try {
-      const {token} = await signUpMutation.mutateAsync({
+      const { accessToken } = await signUpMutation.mutateAsync({
         email: formData.email.trim(),
         password: formData.password,
         ...(formData.name.trim() && { name: formData.name.trim() }),
       });
-      if(typeof window !== 'undefined'){
-        localStorage.setItem('user-token', token);
-      }
+
+      // Store access token (refresh token is in HTTP cookie)
+      TokenManager.setAccessToken(accessToken);
+
         router.push('/dashboard/teacher');
     } catch (error) {
       console.log(error);

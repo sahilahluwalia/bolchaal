@@ -36,13 +36,15 @@ enum ChatSessionStatus {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  name      String?
-  role      UserRole @default(TEACHER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String    @id @default(uuid())
+  email          String    @unique
+  password       String
+  name           String?
+  role           UserRole  @default(TEACHER)
+  refreshToken   String?
+  refreshTokenExpiresAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   classrooms          Classroom[]        @relation("TeacherClassrooms")
   enrollments         StudentClassroom[]
