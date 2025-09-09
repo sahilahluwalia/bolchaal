@@ -8,6 +8,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+generator zod {
+	provider = "prisma-zod-generator"
+}
+
 enum UserRole {
   ADMIN
   TEACHER
