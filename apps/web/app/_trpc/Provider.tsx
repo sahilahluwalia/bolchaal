@@ -27,7 +27,7 @@ export const Provider = ({ children }: { children: React.ReactNode }) => {
                     }
                     return false; // Don't retry other errors
                 },
-                retryDelay: 100, // Small delay to allow token refresh
+                retryDelay: 600, // Allow refresh to complete before retrying
             },
             mutations: {
                 retry: (failureCount, error) => {
@@ -44,7 +44,7 @@ export const Provider = ({ children }: { children: React.ReactNode }) => {
                     }
                     return false;
                 },
-                retryDelay: 100,
+                retryDelay: 600,
             },
         },
     }));

@@ -9,6 +9,12 @@ const createClient = () => {
     links: [
       httpLink({
         url: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005',
+        fetch: (url, options) => {
+          return fetch(url, {
+            ...options,
+            credentials: 'include', // Include cookies with requests
+          });
+        },
         headers: () => {
           const token = TokenManager.getAccessToken();
           if (!token) return {};

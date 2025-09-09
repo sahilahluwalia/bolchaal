@@ -49,17 +49,17 @@ class TokenRefreshService {
         success: true,
         accessToken: result.accessToken,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Token refresh failed:', error);
 
       // If refresh fails, clear tokens
-      if (error?.data?.code === 'UNAUTHORIZED') {
+      if (error && typeof error === 'object' && 'data' in error && error.data && typeof error.data === 'object' && 'code' in error.data && error.data.code === 'UNAUTHORIZED') {
         TokenManager.clearTokens();
       }
 
       return {
         success: false,
-        error: error?.message || 'Token refresh failed',
+        error: error instanceof Error ? error.message : 'Token refresh failed',
       };
     }
   }
@@ -68,8 +68,17 @@ class TokenRefreshService {
    * Check if access token is expired (basic check)
    */
   static isTokenExpired(token: string): boolean {
+    if (!token) return true;
+
     try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
+      const parts = token.split('.');
+      if (parts.length !== 3 || !parts[1]) {
+        throw new Error('Invalid JWT format');
+      }
+      // Base64URL -> Base64 and pad
+      const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+      const padded = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
+      const payload = JSON.parse(atob(padded));
       const currentTime = Date.now() / 1000;
 
       // Add 5 minute buffer before actual expiration
@@ -106,5 +115,36 @@ class TokenRefreshService {
   }
 }
 
-export { TokenRefreshService };
+/**
+ * Debug utility to check token status and manually refresh if needed
+ */
+class TokenDebugService {
+  /**
+   * Get current token status for debugging
+   */
+  static getTokenStatus() {
+    const accessToken = TokenManager.getAccessToken();
+    const isExpired = accessToken ? TokenRefreshService.isTokenExpired(accessToken) : true;
+
+    return {
+      hasAccessToken: !!accessToken,
+      isExpired,
+      tokenLength: accessToken?.length || 0,
+      // Don't log the actual token for security
+    };
+  }
+
+  /**
+   * Manually trigger token refresh for debugging
+   */
+  static async debugRefresh() {
+    console.log('🔄 Manually triggering token refresh...');
+    const result = await TokenRefreshService.refreshAccessToken();
+    console.log('🔄 Token refresh result:', result);
+    return result;
+  }
+
+}
+
+export { TokenRefreshService, TokenDebugService };
 export type { RefreshResult };
