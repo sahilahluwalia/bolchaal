@@ -16,21 +16,21 @@ const t = initTRPC
   .create();
 
 const isAuthed = t.middleware(async ({ ctx, next }) => {
-  const { req, res } = ctx;
-  // Bearer dvsdvs
-  const token = req.headers.authorization?.split(" ")[1] ?? "";
-  const payload = await verifyToken(token);
-  //   .log("middleware req recived");
-  if (!payload) throw new TRPCError({ code: "UNAUTHORIZED" });
-  
-  console.log("middleware passed");
-  return next({
-    ctx: {
-      userId: payload.sub.id,
-      userRole: payload.sub.role,
-      // userRole: payload.role,
-    },
-  });
+  const token = ctx.req.headers.authorization?.split(" ")[1];
+  if (!token) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  try {
+    const payload = await verifyToken(token);
+    return next({
+      ctx: {
+        userId: payload.sub.id,
+        userRole: payload.sub.role,
+      },
+    });
+  } catch {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
 });
 
 export const router = t.router;
