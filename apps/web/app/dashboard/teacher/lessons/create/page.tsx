@@ -2,21 +2,18 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@repo/ui/button";
 import {InputField} from "@repo/ui/input-field";
-interface LessonFormData {
-  title: string;
-  purpose: string;
-  speakingModeOnly: boolean;
-  keyVocabulary: string;
-  keyGrammar: string;
-  studentTask: string;
-  reminderMessage: string;
-  autoCheckIfLessonCompleted: boolean;
-  otherInstructions: string;
-}
+import { trpc } from "../../../../_trpc/client";
+import { toast } from "sonner";
+import { LessonCreateInputObjectSchema } from "@repo/db/client";
 
+
+type LessonFormData = typeof LessonCreateInputObjectSchema;
 export default function CreateLessonPage() {
+
+  const router = useRouter();
   const [formData, setFormData] = useState<LessonFormData>({
     title: "",
     purpose: "",
@@ -31,12 +28,18 @@ export default function CreateLessonPage() {
 
   const [errors, setErrors] = useState<Partial<LessonFormData>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [aiGeneratedContent, setAiGeneratedContent] = useState<Partial<LessonFormData> | null>(null);
+  const [showAiPreview, setShowAiPreview] = useState(false);
+
+  // tRPC mutations
+  const generateAIContent = trpc.generateAILessonContent.useMutation();
+  const createLesson = trpc.createLesson.useMutation();
 
   const handleInputChange = (field: keyof LessonFormData, value: string | boolean) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev: typeof formData) => ({ ...prev, [field]: value }));
     // Clear error when user starts typing
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+      setErrors((prev:typeof errors) => ({ ...prev, [field]: undefined }));
     }
   };
 
@@ -55,6 +58,49 @@ export default function CreateLessonPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleGenerateAIContent = async () => {
+    if (!formData.title.trim() || !formData.purpose.trim()) {
+      toast.error("Please fill in both title and purpose before generating AI content");
+      return;
+    }
+
+    try {
+      const result = await generateAIContent.mutateAsync({
+        title: formData.title,
+        purpose: formData.purpose,
+      });
+
+      const generatedData: Partial<LessonFormData> = {
+        keyVocabulary: result.lessonContent.keyVocabulary,
+        keyGrammar: result.lessonContent.keyGrammar,
+        studentTask: result.lessonContent.studentTask,
+        reminderMessage: result.lessonContent.reminderMessage,
+        otherInstructions: result.lessonContent.otherInstructions,
+      };
+
+      setAiGeneratedContent(generatedData);
+      setShowAiPreview(true);
+      toast.success("AI content generated successfully! 👨‍💻");
+    } catch (error) {
+      console.error("Error generating AI content:", error);
+      toast.error("Failed to generate AI content. Please try again.");
+    }
+  };
+
+  const handleApplyAIContent = () => {
+    if (aiGeneratedContent) {
+      setFormData((prev: typeof formData) => ({ ...prev, ...aiGeneratedContent }));
+      setShowAiPreview(false);
+      setAiGeneratedContent(null);
+      toast.success("AI content applied to form! ✨");
+    }
+  };
+
+  const handleDiscardAIContent = () => {
+    setAiGeneratedContent(null);
+    setShowAiPreview(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -65,16 +111,23 @@ export default function CreateLessonPage() {
     setIsSubmitting(true);
 
     try {
-      // TODO: Implement lesson creation API call
-      console.log("Creating lesson:", formData);
+      await createLesson.mutateAsync({
+        title: formData.title,
+        purpose: formData.purpose,
+        keyVocabulary: formData.keyVocabulary,
+        keyGrammar: formData.keyGrammar,
+        studentTask: formData.studentTask,
+        reminderMessage: formData.reminderMessage,
+        otherInstructions: formData.otherInstructions,
+        speakingModeOnly: formData.speakingModeOnly,
+        autoCheckIfLessonCompleted: formData.autoCheckIfLessonCompleted,
+      });
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Redirect to lessons list on success
-      window.location.href = "/dashboard/teacher/lessons";
+      toast.success("Lesson created successfully! 🎉");
+      router.push("/dashboard/teacher/lessons");
     } catch (error) {
       console.error("Error creating lesson:", error);
+      toast.error("Failed to create lesson. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -95,6 +148,91 @@ export default function CreateLessonPage() {
           ← Back to Lessons
         </Link>
       </div>
+
+      {/* AI Generation Section */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 ">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">🤖 AI-Powered Content Generation</h2>
+            <p className="text-gray-600 text-sm mb-4">
+              Let AI help you create lesson content! Fill in the title and purpose below, then click generate to get AI-suggested content for vocabulary, grammar, tasks, and instructions.
+            </p>
+            {!formData.title.trim() || !formData.purpose.trim() ? (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                <p className="text-yellow-800 text-sm">
+                  📝 <strong>Tip:</strong> Title and purpose are required for AI generation
+                </p>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                onClick={handleGenerateAIContent}
+                disabled={generateAIContent.isPending}
+                className="bg-gradient-to-r  from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+              >
+                {generateAIContent.isPending ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Generating...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    ✨ Generate AI Content
+                  </div>
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* AI Content Preview */}
+      {showAiPreview && aiGeneratedContent && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-green-900">🎯 AI Generated Content</h3>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                onClick={handleApplyAIContent}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                Apply Content
+              </Button>
+              <Button
+                type="button"
+                onClick={handleDiscardAIContent}
+                variant="outline"
+                className="border-gray-300"
+              >
+                Discard
+              </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="bg-white p-3 rounded border">
+              <strong className="text-gray-700">Key Vocabulary:</strong>
+              <p className="text-gray-600 mt-1">{aiGeneratedContent.keyVocabulary}</p>
+            </div>
+            <div className="bg-white p-3 rounded border">
+              <strong className="text-gray-700">Key Grammar:</strong>
+              <p className="text-gray-600 mt-1">{aiGeneratedContent.keyGrammar}</p>
+            </div>
+            <div className="bg-white p-3 rounded border md:col-span-2">
+              <strong className="text-gray-700">Student Task:</strong>
+              <p className="text-gray-600 mt-1">{aiGeneratedContent.studentTask}</p>
+            </div>
+            <div className="bg-white p-3 rounded border md:col-span-2">
+              <strong className="text-gray-700">Reminder Message:</strong>
+              <p className="text-gray-600 mt-1">{aiGeneratedContent.reminderMessage}</p>
+            </div>
+            <div className="bg-white p-3 rounded border md:col-span-2">
+              <strong className="text-gray-700">Other Instructions:</strong>
+              <p className="text-gray-600 mt-1">{aiGeneratedContent.otherInstructions}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-8">

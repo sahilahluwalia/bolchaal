@@ -36,3 +36,4 @@ yarn-error.log*
 # ui
 dist/
 packages/db/generated/prisma
+packages/db/prisma/generated

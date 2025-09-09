@@ -1,68 +1,91 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@repo/ui/button";
+import { trpc } from "../../../../_trpc/client";
 
-interface Lesson {
-  id: string;
-  title: string;
-  purpose: string;
-  speakingModeOnly: boolean;
-  keyVocabulary: string;
-  keyGrammar: string;
-  studentTask: string;
-  reminderMessage: string;
-  autoCheckIfLessonCompleted: boolean;
-  otherInstructions: string;
-  createdAt: string;
-  classroom: string;
-}
+import { toast } from "sonner";
 
 export default function LessonDetailsPage() {
   const params = useParams();
+  const router = useRouter();
   const lessonId = params.id as string;
 
-  // Mock lesson data - in a real app, this would be fetched from API
-  const [lesson] = useState<Lesson>({
-    id: lessonId,
-    title: "Introduction to English Grammar",
-    purpose: "To help students understand basic sentence structure and grammar rules",
-    speakingModeOnly: false,
-    keyVocabulary: "noun, verb, adjective, preposition, conjunction",
-    keyGrammar: "subject-verb agreement, present simple tense",
-    studentTask: "Complete the interactive exercises and practice forming sentences using the vocabulary provided",
-    reminderMessage: "Remember to focus on correct word order in your sentences",
-    autoCheckIfLessonCompleted: true,
-    otherInstructions: "Take your time with each exercise. Practice speaking aloud when possible.",
-  createdAt: "2024-01-15",
-  classroom: "English 101",
-  });
+  // Fetch lesson data using React Query
+  const { data: lesson, isLoading, error } = trpc.getLesson.useQuery(
+    { id: lessonId },
+    {
+      enabled: !!lessonId,
+    }
+  );
 
-  const [isDeleting, setIsDeleting] = useState(false);
+  // Delete lesson mutation
+  const deleteLessonMutation = trpc.deleteLesson.useMutation({
+    onSuccess: () => {
+      toast.success("Lesson deleted successfully");
+      router.push("/dashboard/teacher/lessons");
+    },
+    onError: (error: { message: string }) => {
+      toast.error(`Failed to delete lesson: ${error.message}`);
+    },
+  });
 
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this lesson? This action cannot be undone.")) {
       return;
     }
 
-    setIsDeleting(true);
-    try {
-      // TODO: Implement lesson deletion API call
-      console.log("Deleting lesson:", lessonId);
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Redirect to lessons list on success
-      window.location.href = "/dashboard/teacher/lessons";
-    } catch (error) {
-      console.error("Error deleting lesson:", error);
-    } finally {
-      setIsDeleting(false);
-    }
+    deleteLessonMutation.mutate({ id: lessonId });
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="max-w-4xl mx-auto flex items-center justify-center min-h-96">
+        <div className="flex items-center gap-3">
+          <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-gray-600">Loading lesson...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="max-w-4xl mx-auto flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Lesson</h2>
+          <p className="text-gray-600 mb-4">{error.message}</p>
+          <Link
+            href="/dashboard/teacher/lessons"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+          >
+            Back to Lessons
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // No lesson found
+  if (!lesson) {
+    return (
+      <div className="max-w-4xl mx-auto flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Lesson Not Found</h2>
+          <p className="text-gray-600 mb-4">The lesson you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to view it.</p>
+          <Link
+            href="/dashboard/teacher/lessons"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+          >
+            Back to Lessons
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -90,11 +113,11 @@ export default function LessonDetailsPage() {
         </Link>
         <Button
           onClick={handleDelete}
-          disabled={isDeleting}
+          disabled={deleteLessonMutation.isPending}
           variant="outline"
           className="border-red-300 text-red-700 hover:bg-red-50"
         >
-          {isDeleting ? (
+          {deleteLessonMutation.isPending ? (
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 border-2 border-red-700 border-t-transparent rounded-full animate-spin"></div>
               Deleting...
@@ -188,12 +211,16 @@ export default function LessonDetailsPage() {
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Lesson Information</h2>
             <div className="space-y-3">
               <div>
-                <span className="text-sm text-gray-600">Classroom</span>
-                <p className="font-medium text-gray-900">{lesson.classroom}</p>
+                <span className="text-sm text-gray-600">Created</span>
+                <p className="font-medium text-gray-900">
+                  {new Date(lesson.createdAt).toLocaleDateString()}
+                </p>
               </div>
               <div>
-                <span className="text-sm text-gray-600">Created</span>
-                <p className="font-medium text-gray-900">{lesson.createdAt}</p>
+                <span className="text-sm text-gray-600">Last Updated</span>
+                <p className="font-medium text-gray-900">
+                  {new Date(lesson.updatedAt).toLocaleDateString()}
+                </p>
               </div>
             </div>
           </div>

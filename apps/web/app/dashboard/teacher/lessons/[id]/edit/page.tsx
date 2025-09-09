@@ -2,24 +2,20 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Button } from "@repo/ui/button";
 import { InputField } from "@repo/ui/input-field";
+import { trpc } from "../../../../../_trpc/client";
 
-interface LessonFormData {
-  title: string;
-  purpose: string;
-  speakingModeOnly: boolean;
-  keyVocabulary: string;
-  keyGrammar: string;
-  studentTask: string;
-  reminderMessage: string;
-  autoCheckIfLessonCompleted: boolean;
-  otherInstructions: string;
-}
+import { toast } from "sonner";
+import { LessonCreateInputObjectSchema } from "@repo/db/client";
+
+type LessonFormData = typeof LessonCreateInputObjectSchema
+
 
 export default function EditLessonPage() {
   const params = useParams();
+  const router = useRouter();
   const lessonId = params.id as string;
 
   const [formData, setFormData] = useState<LessonFormData>({
@@ -35,42 +31,47 @@ export default function EditLessonPage() {
   });
 
   const [errors, setErrors] = useState<Partial<LessonFormData>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [aiGeneratedContent, setAiGeneratedContent] = useState<Partial<LessonFormData> | null>(null);
+  const [showAiPreview, setShowAiPreview] = useState(false);
 
-  // Simulate loading lesson data
+  // Fetch lesson data using React Query
+  const { data: lesson, isLoading, error } = trpc.getLesson.useQuery(
+    { id: lessonId },
+    {
+      enabled: !!lessonId,
+    }
+  );
+
+  // Update lesson mutation
+  const updateLessonMutation = trpc.updateLesson.useMutation({
+    onSuccess: () => {
+      toast.success("Lesson updated successfully");
+      router.push(`/dashboard/teacher/lessons/${lessonId}`);
+    },
+    onError: (error: { message: string }) => {
+      toast.error(`Failed to update lesson: ${error.message}`);
+    },
+  });
+
+  // Generate AI content mutation
+  const generateAIContent = trpc.generateAILessonContent.useMutation();
+
+  // Populate form data when lesson is loaded
   useEffect(() => {
-    const loadLesson = async () => {
-      try {
-        // TODO: Implement lesson fetch API call
-        console.log("Loading lesson:", lessonId);
-
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Mock lesson data
-        const lessonData: LessonFormData = {
-          title: "Introduction to English Grammar",
-          purpose: "To help students understand basic sentence structure and grammar rules",
-          speakingModeOnly: false,
-          keyVocabulary: "noun, verb, adjective, preposition, conjunction",
-          keyGrammar: "subject-verb agreement, present simple tense",
-          studentTask: "Complete the interactive exercises and practice forming sentences using the vocabulary provided",
-          reminderMessage: "Remember to focus on correct word order in your sentences",
-          autoCheckIfLessonCompleted: true,
-          otherInstructions: "Take your time with each exercise. Practice speaking aloud when possible.",
-        };
-
-        setFormData(lessonData);
-      } catch (error) {
-        console.error("Error loading lesson:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadLesson();
-  }, [lessonId]);
+    if (lesson) {
+      setFormData({
+        title: lesson.title,
+        purpose: lesson.purpose,
+        speakingModeOnly: lesson.speakingModeOnly,
+        keyVocabulary: lesson.keyVocabulary,
+        keyGrammar: lesson.keyGrammar,
+        studentTask: lesson.studentTask,
+        reminderMessage: lesson.reminderMessage,
+        autoCheckIfLessonCompleted: lesson.autoCheckIfLessonCompleted,
+        otherInstructions: lesson.otherInstructions,
+      });
+    }
+  }, [lesson]);
 
   const handleInputChange = (field: keyof LessonFormData, value: string | boolean) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -95,6 +96,49 @@ export default function EditLessonPage() {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleGenerateAIContent = async () => {
+    if (!formData.title.trim() || !formData.purpose.trim()) {
+      toast.error("Please fill in both title and purpose before generating AI content");
+      return;
+    }
+
+    try {
+      const result = await generateAIContent.mutateAsync({
+        title: formData.title,
+        purpose: formData.purpose,
+      });
+
+      const generatedData: Partial<LessonFormData> = {
+        keyVocabulary: result.lessonContent.keyVocabulary,
+        keyGrammar: result.lessonContent.keyGrammar,
+        studentTask: result.lessonContent.studentTask,
+        reminderMessage: result.lessonContent.reminderMessage,
+        otherInstructions: result.lessonContent.otherInstructions,
+      };
+
+      setAiGeneratedContent(generatedData);
+      setShowAiPreview(true);
+      toast.success("AI content generated successfully! 👨‍💻");
+    } catch (error) {
+      console.error("Error generating AI content:", error);
+      toast.error("Failed to generate AI content. Please try again.");
+    }
+  };
+
+  const handleApplyAIContent = () => {
+    if (aiGeneratedContent) {
+      setFormData((prev) => ({ ...prev, ...aiGeneratedContent }));
+      setShowAiPreview(false);
+      setAiGeneratedContent(null);
+      toast.success("AI content applied to form! ✨");
+    }
+  };
+
+  const handleDiscardAIContent = () => {
+    setAiGeneratedContent(null);
+    setShowAiPreview(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -102,30 +146,43 @@ export default function EditLessonPage() {
       return;
     }
 
-    setIsSubmitting(true);
-
-    try {
-      // TODO: Implement lesson update API call
-      console.log("Updating lesson:", lessonId, formData);
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Redirect to lesson details on success
-      window.location.href = `/dashboard/teacher/lessons/${lessonId}`;
-    } catch (error) {
-      console.error("Error updating lesson:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
+    updateLessonMutation.mutate({
+      id: lessonId,
+      ...formData,
+    });
   };
 
-  if (isLoading) {
+  // Error state
+  if (error) {
     return (
       <div className="max-w-4xl mx-auto flex items-center justify-center min-h-96">
-        <div className="flex items-center gap-3">
-          <div className="w-6 h-6 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-gray-600">Loading lesson...</span>
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Lesson</h2>
+          <p className="text-gray-600 mb-4">{error.message}</p>
+          <Link
+            href={`/dashboard/teacher/lessons/${lessonId}`}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+          >
+            Back to Lesson
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // No lesson found
+  if (!isLoading && !lesson) {
+    return (
+      <div className="max-w-4xl mx-auto flex items-center justify-center min-h-96">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Lesson Not Found</h2>
+          <p className="text-gray-600 mb-4">The lesson you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to edit it.</p>
+          <Link
+            href="/dashboard/teacher/lessons"
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+          >
+            Back to Lessons
+          </Link>
         </div>
       </div>
     );
@@ -154,6 +211,91 @@ export default function EditLessonPage() {
           </Link>
         </div>
       </div>
+
+      {/* AI Generation Section */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 ">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">🤖 AI-Powered Content Generation</h2>
+            <p className="text-gray-600 text-sm mb-4">
+              Let AI help you enhance your lesson content! Fill in the title and purpose below, then click generate to get AI-suggested content for vocabulary, grammar, tasks, and instructions.
+            </p>
+            {!formData.title.trim() || !formData.purpose.trim() ? (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                <p className="text-yellow-800 text-sm">
+                  📝 <strong>Tip:</strong> Title and purpose are required for AI generation
+                </p>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                onClick={handleGenerateAIContent}
+                disabled={generateAIContent.isPending}
+                className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+              >
+                {generateAIContent.isPending ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Generating...
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    ✨ Generate AI Content
+                  </div>
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* AI Content Preview */}
+      {showAiPreview && aiGeneratedContent && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-green-900">🎯 AI Generated Content</h3>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                onClick={handleApplyAIContent}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                Apply Content
+              </Button>
+              <Button
+                type="button"
+                onClick={handleDiscardAIContent}
+                variant="outline"
+                className="border-gray-300"
+              >
+                Discard
+              </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div className="bg-white p-3 rounded border">
+              <strong className="text-gray-700">Key Vocabulary:</strong>
+              <p className="text-gray-600 mt-1">{aiGeneratedContent.keyVocabulary}</p>
+            </div>
+            <div className="bg-white p-3 rounded border">
+              <strong className="text-gray-700">Key Grammar:</strong>
+              <p className="text-gray-600 mt-1">{aiGeneratedContent.keyGrammar}</p>
+            </div>
+            <div className="bg-white p-3 rounded border md:col-span-2">
+              <strong className="text-gray-700">Student Task:</strong>
+              <p className="text-gray-600 mt-1">{aiGeneratedContent.studentTask}</p>
+            </div>
+            <div className="bg-white p-3 rounded border md:col-span-2">
+              <strong className="text-gray-700">Reminder Message:</strong>
+              <p className="text-gray-600 mt-1">{aiGeneratedContent.reminderMessage}</p>
+            </div>
+            <div className="bg-white p-3 rounded border md:col-span-2">
+              <strong className="text-gray-700">Other Instructions:</strong>
+              <p className="text-gray-600 mt-1">{aiGeneratedContent.otherInstructions}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-8">
@@ -322,10 +464,10 @@ export default function EditLessonPage() {
           </Link>
           <Button
             type="submit"
-            disabled={isSubmitting}
+            disabled={updateLessonMutation.isPending}
             className="px-6 py-2"
           >
-            {isSubmitting ? (
+            {updateLessonMutation.isPending ? (
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 Updating...
