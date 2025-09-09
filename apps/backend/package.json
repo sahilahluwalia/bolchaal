@@ -33,7 +33,7 @@
     "tsx": "^4.20.5"
   },
   "exports": {
-    "./server":  "./server/index.ts",
-    "./trpc":  "./server/trpc.ts"
+    "./server": "./server/index.ts",
+    "./trpc": "./server/trpc.ts"
   }
 }

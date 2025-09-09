@@ -11,8 +11,9 @@ import { prismaClient } from "@repo/db/client";
 import { TRPCError } from "@trpc/server";
 import { generateToken } from "../utils/auth";  
 import 'dotenv/config'
+import cors from 'cors';
 
-export const appRouter: ReturnType<typeof router> = router({
+export const appRouter = router({
   hello: publicProcedure.query(() => {
     return { message: "Hello World" };
   }),
@@ -44,18 +45,11 @@ export const appRouter: ReturnType<typeof router> = router({
         });
       }
 
-      const result = await prismaClient.user.create({
+      const user = await prismaClient.user.create({
         data: {
           email,
           password, // TODO: Hash password before storing
           ...(name && { name }),
-        },
-        select: {
-          id: true,
-          email: true,
-          name: true,
-          role: true,
-          createdAt: true,
         },
       });
 // "result": {
@@ -68,10 +62,8 @@ export const appRouter: ReturnType<typeof router> = router({
 //                 "updatedAt": "2025-09-08T09:59:16.836Z"
 //             }   
       
-      console.log(result);
-      // check if user exist then
-      // TODO: Implement sign up logic
-      return { message: "Sign up successful", result };
+      const token=await generateToken(user.id)
+      return { message: "Sign up successful", token };
     }),
   chat: publicProcedure
     .input(
@@ -108,7 +100,11 @@ export const appRouter: ReturnType<typeof router> = router({
         email: z.string(),
         password: z.string(),
       })
-    )
+    ).output(z.object({
+      message: z.string(),
+      token: z.string(),
+      role: z.enum(["TEACHER", "STUDENT","ADMIN"]),
+    }))
     .mutation(async (opts) => {
       const { input:{
         email,password
@@ -116,17 +112,19 @@ export const appRouter: ReturnType<typeof router> = router({
       const user= await prismaClient.user.findFirst({
         select:{
           id:true,
+          role:true,
         },
         where:{
           email:email,
-          password:password
+          password:password,
         }
       })
       console.log(user)
       if(!user) throw new TRPCError({code:"UNAUTHORIZED",message:"Invalid email or password"})
       const token=await generateToken(user.id)
+
       // TODO: Implement sign in logic
-      return { message: "Sign in successful" ,token};
+      return { message: "Sign in successful" ,token,role:user.role};
     }),
     toDo:publicProcedure.query(async () => {
       return [1,2,3]
@@ -134,6 +132,7 @@ export const appRouter: ReturnType<typeof router> = router({
 });
 
 const server = createHTTPServer({
+  middleware: cors(),
   router: appRouter,
   createContext: createTRPCContext,
   // createContext: (opts) => {

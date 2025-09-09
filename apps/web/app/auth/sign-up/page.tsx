@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { trpc } from '../../../utils/trpc';
+import { trpc } from '../../_trpc/client';
 import { TRPCClientError } from '@trpc/client';
 import { Button } from '@repo/ui/button';
 import { AuthFooter } from '../../components/auth-footer';
@@ -79,7 +79,7 @@ export default function SignUpPage() {
       setErrors(prev => ({ ...prev, [name]: undefined }));
     }
   };
-
+  const signUpMutation = trpc.signUp.useMutation();
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -89,15 +89,17 @@ export default function SignUpPage() {
     setErrors({});
 
     try {
-      const result = await trpc.signUp.mutateAsync({
+      const {token} = await signUpMutation.mutateAsync({
         email: formData.email.trim(),
         password: formData.password,
         ...(formData.name.trim() && { name: formData.name.trim() }),
       });
-
-      // Success - redirect to sign-in or dashboard
-      router.push('/auth/sign-in?message=Account created successfully');
+      if(typeof window !== 'undefined'){
+        localStorage.setItem('user-token', token);
+      }
+        router.push('/dashboard/teacher');
     } catch (error) {
+      console.log(error);
       if (error instanceof TRPCClientError) {
         setErrors({ general: error.message });
       } else {

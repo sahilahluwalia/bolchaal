@@ -1,13 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { InputField } from '@repo/ui/input-field';
 import { Button } from '@repo/ui/button';
 import { AuthFooter } from '../../components/auth-footer';
 import { DemoAccountBox } from '@repo/ui/demo-account-box';
-import { trpc } from '../../../utils/trpc';
+import { trpc } from '../../_trpc/client';
 import { TRPCClientError } from '@trpc/client';
 
 interface FormData {
@@ -23,7 +23,6 @@ interface FormErrors {
 
 export default function SignInPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [formData, setFormData] = useState<FormData>({
     email: '',
     password: '',
@@ -31,7 +30,6 @@ export default function SignInPage() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const signInMutation = trpc.signIn.useMutation();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -58,6 +56,7 @@ export default function SignInPage() {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+  const signInMutation = trpc.signIn.useMutation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,22 +66,23 @@ export default function SignInPage() {
     setErrors({});
 
     try {
-      const { token } = await signInMutation.mutateAsync({
+      const { token,role } = await signInMutation.mutateAsync({
         email: formData.email.trim(),
         password: formData.password,
       });
 
       // Persist token for subsequent requests (simple localStorage for now)
       if (typeof window !== 'undefined') {
-        localStorage.setItem('auth_token', token);
+        localStorage.setItem('user-token', token);
+      }
+      if(role === 'TEACHER'){
+        router.push('/dashboard/teacher');
+      }else{
+        router.push('/dashboard/student');
       }
 
-      // Optional success message from query param
-      const message = searchParams.get('message');
-      const next = searchParams.get('next');
-
-      router.push(next || '/');
     } catch (error) {
+      console.log(error);
       if (error instanceof TRPCClientError) {
         setErrors({ general: error.message });
       } else {
