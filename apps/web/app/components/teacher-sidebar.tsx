@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { cn } from "../../utils/cn";
 import { TokenManager } from "../../utils/auth";
+import { useUserProfile } from "../../utils/hooks";
 
 interface TeacherSidebarProps {
   className?: string;
@@ -14,6 +15,7 @@ export function TeacherSidebar({ className }: TeacherSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const { data: userProfile, isLoading } = useUserProfile();
 
   const handleLogout = async () => {
     try {
@@ -165,8 +167,12 @@ export function TeacherSidebar({ className }: TeacherSidebarProps) {
           </div>
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">Teacher Name</p>
-              <p className="text-xs text-gray-500 truncate">teacher@school.edu</p>
+              <p className="text-sm font-medium text-gray-900 truncate">
+                {isLoading ? "Loading..." : (userProfile?.name || "Teacher")}
+              </p>
+              <p className="text-xs text-gray-500 truncate">
+                {isLoading ? "Loading..." : (userProfile?.email || "teacher@school.edu")}
+              </p>
             </div>
           )}
         </div>
