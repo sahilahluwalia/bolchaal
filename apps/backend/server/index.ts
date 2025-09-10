@@ -15,6 +15,7 @@ import {
 } from "@repo/db/client";
 import { TRPCError } from "@trpc/server";
 import { generateToken, generateTokenPair, verifyRefreshToken } from "../utils/auth";
+import { randomBytes } from "crypto";
 import "dotenv/config";
 import cors from "cors";
 import { generateText, generateObject } from "ai";
@@ -884,11 +885,17 @@ export const appRouter = router({
           });
         }
 
+        // Determine active status: first attached becomes active, subsequent are inactive by default
+        const alreadyActive = await prismaClient.classroomLesson.findFirst({
+          where: { classroomId, isActive: true },
+        });
+
         // Attach lesson to classroom
         const classroomLesson = await prismaClient.classroomLesson.create({
           data: {
             classroomId,
             lessonId,
+            isActive: alreadyActive ? false : true,
           },
         });
 
@@ -1022,6 +1029,64 @@ export const appRouter = router({
         });
       }
     }),
+  setActiveLessonForClassroom: privateProcedure
+    .input(
+      z.object({
+        classroomId: z.string(),
+        lessonId: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      try {
+        const { classroomId, lessonId } = opts.input;
+
+        // Verify classroom belongs to teacher
+        const classroom = await prismaClient.classroom.findFirst({
+          where: { id: classroomId, teacherId: opts.ctx.userId },
+        });
+
+        if (!classroom) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Classroom not found",
+          });
+        }
+
+        // Ensure the lesson is attached to this classroom
+        const relation = await prismaClient.classroomLesson.findFirst({
+          where: { classroomId, lessonId },
+        });
+
+        if (!relation) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Lesson is not attached to this classroom",
+          });
+        }
+
+        await prismaClient.$transaction([
+          // Deactivate any currently active lesson for this classroom
+          prismaClient.classroomLesson.updateMany({
+            where: { classroomId, isActive: true },
+            data: { isActive: false },
+          }),
+          // Activate the selected lesson
+          prismaClient.classroomLesson.updateMany({
+            where: { classroomId, lessonId },
+            data: { isActive: true },
+          }),
+        ]);
+
+        return { success: true };
+      } catch (error) {
+        console.log(error);
+        if (error instanceof TRPCError) throw error;
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to set active lesson",
+        });
+      }
+    }),
   getAvailableLessons: privateProcedure
     .input(z.object({ classroomId: z.string() }))
     .query(async (opts) => {
@@ -1147,9 +1212,360 @@ export const appRouter = router({
       });
       return user;
     }),
+    updateProfile: privateProcedure
+      .input(
+        z.object({
+          name: z.string().min(1, "Name is required"),
+          email: z.string().email("Invalid email format"),
+        })
+      )
+      .mutation(async (opts) => {
+        const { name, email } = opts.input;
+        
+        // Check if email is already taken by another user
+        const existingUser = await prismaClient.user.findFirst({
+          where: {
+            email,
+            id: { not: opts.ctx.userId },
+          },
+        });
+        if (existingUser) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Email is already taken by another user",
+          });
+        }
+
+        const updatedUser = await prismaClient.user.update({
+          where: {
+            id: opts.ctx.userId,
+          },
+          data: {
+            name,
+            email,
+          },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+          },
+        });
+
+        return {
+          message: "Profile updated successfully",
+          user: updatedUser,
+        };
+      }),
   toDo: publicProcedure.query(async () => {
     return [1, 2, 3];
   }),
+
+  /**
+   * Create a student invitation under the current teacher.
+   * Optionally restrict to a classroom (nullable) and/or email (nullable).
+   */
+  createStudentInvite: privateProcedure
+    .input(
+      z.object({
+        email: z.string().email().optional(),
+        classroomId: z.string().optional(),
+        expiresInHours: z.number().int().min(1).max(24 * 30).optional(), // default 7 days
+      })
+    )
+    .output(
+      z.object({
+        token: z.string(),
+        expiresAt: z.date(),
+        invitationId: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      if (opts.ctx.userRole !== "TEACHER") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Only teachers can create invites" });
+      }
+
+      const { email, classroomId, expiresInHours } = opts.input;
+
+      if (classroomId) {
+        const classroom = await prismaClient.classroom.findFirst({
+          where: { id: classroomId, teacherId: opts.ctx.userId },
+          select: { id: true },
+        });
+        if (!classroom) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Classroom not found" });
+        }
+      }
+
+      const token = randomBytes(12).toString("hex");
+      const hours = expiresInHours ?? 24 * 7;
+      const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+
+      const invitation = await prismaClient.invitation.create({
+        data: {
+          token,
+          ...(email ? { email } : {}),
+          ...(classroomId ? { classroomId } : {}),
+          invitedById: opts.ctx.userId,
+          expiresAt,
+        },
+        select: { id: true, token: true, expiresAt: true },
+      });
+
+      return {
+        token: invitation.token,
+        expiresAt: invitation.expiresAt,
+        invitationId: invitation.id,
+      };
+    }),
+
+  /**
+   * Get invitation details for a token. Public.
+   */
+  getInvitationDetails: publicProcedure
+    .input(z.object({ token: z.string().min(6) }))
+    .output(
+      z.object({
+        valid: z.boolean(),
+        expired: z.boolean().optional(),
+        status: z.enum(["PENDING", "ACCEPTED", "EXPIRED"]).optional(),
+        teacher: z
+          .object({ id: z.string(), name: z.string().nullable(), email: z.string() })
+          .optional(),
+        classroom: z
+          .object({ id: z.string(), name: z.string() })
+          .nullable()
+          .optional(),
+      })
+    )
+    .query(async (opts) => {
+      const inv = await prismaClient.invitation.findUnique({
+        where: { token: opts.input.token },
+        include: {
+          invitedBy: { select: { id: true, name: true, email: true } },
+          classroom: { select: { id: true, name: true } },
+        },
+      });
+
+      if (!inv) return { valid: false };
+      const now = new Date();
+      const expired = inv.expiresAt < now;
+      return {
+        valid: !expired && inv.status === "PENDING",
+        expired,
+        status: inv.status as any,
+        teacher: inv.invitedBy,
+        classroom: inv.classroom ?? null,
+      };
+    }),
+
+  /**
+   * Student signs up with invitation token
+   */
+  studentSignUpWithInvitation: publicProcedure
+    .input(
+      z.object({
+        token: z.string().min(6),
+        email: z.email(),
+        password: z.string().min(6),
+        name: z.string().min(1),
+      })
+    )
+    .output(
+      z.object({
+        message: z.string(),
+        accessToken: z.string(),
+        role: z.enum(["TEACHER", "STUDENT", "ADMIN"]),
+      })
+    )
+    .mutation(async (opts) => {
+      const { token, email, password, name } = opts.input;
+
+      const invitation = await prismaClient.invitation.findUnique({
+        where: { token },
+        include: { invitedBy: true },
+      });
+
+      if (!invitation) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Invalid invite token" });
+      }
+      if (invitation.status !== "PENDING") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invitation already used or expired" });
+      }
+      if (invitation.expiresAt < new Date()) {
+        await prismaClient.invitation.update({
+          where: { id: invitation.id },
+          data: { status: "EXPIRED" },
+        });
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Invitation expired" });
+      }
+      if (invitation.email && invitation.email.toLowerCase() !== email.toLowerCase()) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Email does not match invitation" });
+      }
+
+      const existing = await prismaClient.user.findUnique({ where: { email } });
+      if (existing) {
+        throw new TRPCError({ code: "CONFLICT", message: "User with this email already exists" });
+      }
+
+      const user = await prismaClient.user.create({
+        data: {
+          email,
+          password, // TODO: hash
+          name: name && name.trim().length > 0 ? name : null,
+          role: "STUDENT",
+        },
+      });
+
+      await prismaClient.invitation.update({
+        where: { id: invitation.id },
+        data: {
+          recipientId: user.id,
+          acceptedAt: new Date(),
+          status: "ACCEPTED",
+        },
+      });
+
+      const { accessToken, refreshToken } = await generateTokenPair({ id: user.id, role: user.role });
+      await prismaClient.user.update({
+        where: { id: user.id },
+        data: {
+          refreshToken,
+          refreshTokenExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        },
+      });
+      opts.ctx.res.setHeader('Set-Cookie', createRefreshTokenCookie(refreshToken));
+
+      return { message: "Sign up successful", accessToken, role: user.role };
+    }),
+
+  /**
+   * Get students associated with the current teacher (accepted invites or enrolled in teacher's classrooms)
+   */
+  getTeacherStudents: privateProcedure
+    .query(async (opts) => {
+      if (opts.ctx.userRole !== "TEACHER") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const students = await prismaClient.user.findMany({
+        where: {
+          role: "STUDENT",
+          OR: [
+            { receivedInvitations: { some: { invitedById: opts.ctx.userId, status: "ACCEPTED" } } },
+            { enrollments: { some: { classroom: { teacherId: opts.ctx.userId } } } },
+          ],
+        },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          enrollments: {
+            where: { classroom: { teacherId: opts.ctx.userId } },
+            select: { classroom: { select: { id: true, name: true } }, enrolledAt: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return students.map((s) => ({
+        id: s.id,
+        name: s.name,
+        email: s.email,
+        classrooms: s.enrollments.map((e) => ({ id: e.classroom.id, name: e.classroom.name })),
+        enrollmentDate: s.enrollments.sort((a,b)=>a.enrolledAt.getTime()-b.enrolledAt.getTime())[0]?.enrolledAt ?? null,
+      }));
+    }),
+
+  /**
+   * Get students under teacher that are not enrolled in the specified classroom
+   */
+  getAvailableStudents: privateProcedure
+    .input(z.object({ classroomId: z.string() }))
+    .query(async (opts) => {
+      if (opts.ctx.userRole !== "TEACHER") throw new TRPCError({ code: "FORBIDDEN" });
+      const { classroomId } = opts.input;
+
+      const classroom = await prismaClient.classroom.findFirst({ where: { id: classroomId, teacherId: opts.ctx.userId }, select: { id: true } });
+      if (!classroom) throw new TRPCError({ code: "NOT_FOUND", message: "Classroom not found" });
+
+      const enrolled = await prismaClient.studentClassroom.findMany({ where: { classroomId }, select: { studentId: true } });
+      const enrolledIds = new Set(enrolled.map((e) => e.studentId));
+
+      const students = await prismaClient.user.findMany({
+        where: {
+          role: "STUDENT",
+          OR: [
+            { receivedInvitations: { some: { invitedById: opts.ctx.userId, status: "ACCEPTED" } } },
+            { enrollments: { some: { classroom: { teacherId: opts.ctx.userId } } } },
+          ],
+        },
+        select: { id: true, name: true, email: true },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return students.filter((s) => !enrolledIds.has(s.id));
+    }),
+
+  /**
+   * Attach a student to a classroom
+   */
+  attachStudentToClassroom: privateProcedure
+    .input(z.object({ classroomId: z.string(), studentId: z.string() }))
+    .mutation(async (opts) => {
+      if (opts.ctx.userRole !== "TEACHER") throw new TRPCError({ code: "FORBIDDEN" });
+      const { classroomId, studentId } = opts.input;
+
+      const classroom = await prismaClient.classroom.findFirst({ where: { id: classroomId, teacherId: opts.ctx.userId } });
+      if (!classroom) throw new TRPCError({ code: "NOT_FOUND", message: "Classroom not found" });
+
+      const student = await prismaClient.user.findFirst({ where: { id: studentId, role: "STUDENT" } });
+      if (!student) throw new TRPCError({ code: "NOT_FOUND", message: "Student not found" });
+
+      const exists = await prismaClient.studentClassroom.findFirst({ where: { classroomId, studentId } });
+      if (exists) {
+        throw new TRPCError({ code: "CONFLICT", message: "Student already enrolled in classroom" });
+      }
+
+      const enrollment = await prismaClient.studentClassroom.create({ data: { classroomId, studentId } });
+
+      // Ensure a ChatSession record exists for this student and classroom
+      // (unique on [studentId, classroomId])
+      try {
+        await prismaClient.chatSession.create({ data: { classroomId, studentId } });
+      } catch (e) {
+        // Ignore if unique constraint hits (already exists)
+      }
+      return enrollment;
+    }),
+  /**
+   * Detach a student from a classroom
+   */
+  detachStudentFromClassroom: privateProcedure
+    .input(z.object({ classroomId: z.string(), studentId: z.string() }))
+    .mutation(async (opts) => {
+      if (opts.ctx.userRole !== "TEACHER") throw new TRPCError({ code: "FORBIDDEN" });
+      const { classroomId, studentId } = opts.input;
+
+      // Verify classroom ownership
+      const classroom = await prismaClient.classroom.findFirst({ where: { id: classroomId, teacherId: opts.ctx.userId } });
+      if (!classroom) throw new TRPCError({ code: "NOT_FOUND", message: "Classroom not found" });
+
+      // Verify enrollment exists
+      const enrollment = await prismaClient.studentClassroom.findFirst({ where: { classroomId, studentId } });
+      if (!enrollment) {
+        // Nothing to do
+        return { success: true };
+      }
+
+      // Remove enrollment, cascade chat sessions by unique [studentId, classroomId]
+      await prismaClient.$transaction([
+        prismaClient.chatSession.deleteMany({ where: { classroomId, studentId } }),
+        prismaClient.studentClassroom.delete({ where: { id: enrollment.id } }),
+      ]);
+
+      return { success: true };
+    }),
 });
 
 const server = createHTTPServer({
