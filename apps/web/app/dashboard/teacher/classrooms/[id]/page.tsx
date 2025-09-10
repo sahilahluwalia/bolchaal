@@ -13,6 +13,7 @@ export default function ClassroomDetailsPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [lessonToDetach, setLessonToDetach] = useState<{ id: string; title: string } | null>(null);
+  const [studentToRemove, setStudentToRemove] = useState<{ id: string; name: string | null; email: string } | null>(null);
 
   const { data: classroom, isLoading, error, refetch } = trpc.getClassroom.useQuery(
     { id: classroomId },
@@ -20,7 +21,9 @@ export default function ClassroomDetailsPage() {
   );
 
   const detachLessonMutation = trpc.detachLessonFromClassroom.useMutation();
+  const setActiveLessonMutation = trpc.setActiveLessonForClassroom.useMutation();
   const deleteClassroomMutation = trpc.deleteClassroom.useMutation();
+  const detachStudentMutation = trpc.detachStudentFromClassroom.useMutation();
 
   const handleDetachLesson = (lessonId: string, title: string) => {
     console.log("Frontend: Handle detach lesson called", {
@@ -58,6 +61,30 @@ export default function ClassroomDetailsPage() {
 
   const cancelDetach = () => {
     setLessonToDetach(null);
+  };
+
+  const handleRemoveStudent = (studentId: string, name: string | null, email: string) => {
+    setStudentToRemove({ id: studentId, name, email });
+  };
+
+  const confirmRemoveStudent = async () => {
+    if (!studentToRemove) return;
+    try {
+      await detachStudentMutation.mutateAsync({ classroomId, studentId: studentToRemove.id });
+      await refetch();
+      setStudentToRemove(null);
+    } catch (e) {
+      console.error("Failed to remove student", e);
+    }
+  };
+
+  const makeActive = async (lessonId: string) => {
+    try {
+      await setActiveLessonMutation.mutateAsync({ classroomId, lessonId });
+      await refetch();
+    } catch (e) {
+      console.error("Failed to activate lesson", e);
+    }
   };
 
   if (isLoading) {
@@ -134,7 +161,9 @@ export default function ClassroomDetailsPage() {
           <Link href={`/dashboard/teacher/classrooms/${classroomId}/attach-lesson`}>
             <Button variant="outline">Attach Lesson</Button>
           </Link>
-          <Button variant="outline">Manage Students</Button>
+          <Link href={`/dashboard/teacher/classrooms/${classroomId}/attach-students`}>
+            <Button variant="outline">Manage Students</Button>
+          </Link>
           <div className="relative">
             <Button
               variant="ghost"
@@ -244,7 +273,9 @@ export default function ClassroomDetailsPage() {
         <div className="bg-white border border-gray-200 rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Enrolled Students</h3>
-            <Button variant="outline" size="sm">Manage Students</Button>
+            <Link href={`/dashboard/teacher/classrooms/${classroomId}/attach-students`}>
+              <Button variant="outline" size="sm">Manage Students</Button>
+            </Link>
           </div>
           {classroom.enrollments.length > 0 ? (
             <div className="space-y-3">
@@ -264,7 +295,17 @@ export default function ClassroomDetailsPage() {
                       <p className="text-xs text-gray-500">{enrollment.student.email}</p>
                     </div>
                   </div>
-                  <span className="text-xs text-gray-500">{formatDate(enrollment.enrolledAt)}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-gray-500">{formatDate(enrollment.enrolledAt)}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={() => handleRemoveStudent(enrollment.student.id, enrollment.student.name, enrollment.student.email)}
+                    >
+                      Remove
+                    </Button>
+                  </div>
                 </div>
               ))}
               {classroom.enrollments.length > 5 && (
@@ -288,7 +329,7 @@ export default function ClassroomDetailsPage() {
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-lg font-semibold text-gray-900">Attached Lessons</h3>
-              <p className="text-sm text-gray-600">Lessons available to students in this classroom</p>
+              <p className="text-sm text-gray-600">You can attach multiple lessons, but only one can be active at a time.</p>
             </div>
             <Link href={`/dashboard/teacher/classrooms/${classroomId}/attach-lesson`}>
               <Button variant="outline" size="sm">
@@ -334,6 +375,17 @@ export default function ClassroomDetailsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3 ml-4">
+                  {!classroomLesson.isActive && (
+                      <Button
+                        size="sm"
+                        onClick={() => makeActive(classroomLesson.lesson.id)}
+                        disabled={setActiveLessonMutation.isPending}
+                        className="hover:text-indigo-50 hover:bg-indigo-700 bg-indigo-50 text-indigo-600"
+                        title="Make this the active lesson"
+                      >
+                        {setActiveLessonMutation.isPending ? "Activating..." : "Make Active"}
+                      </Button>
+                    )}
                     <div className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
                       classroomLesson.isActive
                         ? "bg-green-100 text-green-800"
@@ -341,6 +393,7 @@ export default function ClassroomDetailsPage() {
                     }`}>
                       {classroomLesson.isActive ? "Active" : "Inactive"}
                     </div>
+                   
                     <Button
                       variant="ghost"
                       size="sm"
@@ -529,6 +582,42 @@ export default function ClassroomDetailsPage() {
           cancelText="Cancel"
           confirmText={detachLessonMutation.isPending ? "Detaching..." : "Detach Lesson"}
           isLoading={detachLessonMutation.isPending}
+        />
+      </Dialog>
+
+      {/* Remove Student Confirmation Dialog */}
+      <Dialog
+        isOpen={!!studentToRemove}
+        onClose={() => setStudentToRemove(null)}
+        title="Remove Student"
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+            <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm text-gray-600">Remove student from classroom</p>
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <p className="text-sm text-gray-700">
+            Are you sure you want to remove
+            {" "}
+            <span className="font-medium">{studentToRemove?.name || studentToRemove?.email}</span>
+            {" "}
+            from this classroom? This will also remove any active chat sessions in this class.
+          </p>
+        </div>
+
+        <DialogActions
+          onCancel={() => setStudentToRemove(null)}
+          onConfirm={confirmRemoveStudent}
+          cancelText="Cancel"
+          confirmText={detachStudentMutation.isPending ? "Removing..." : "Remove Student"}
+          isLoading={detachStudentMutation.isPending}
         />
       </Dialog>
     </div>

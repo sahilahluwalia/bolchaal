@@ -115,7 +115,7 @@ export default function RootLayout({
         <>{children}</>
         <ReactQueryDevtools initialIsOpen={false} />
         </Provider>
-        <Toaster position="top-right" richColors />
+        <Toaster position="bottom-right" richColors />
       </body>
     </html>
   );
