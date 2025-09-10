@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { RequireAuth } from "../../components/require-auth";
 import { StudentSidebar } from "../../components/student-sidebar";
 
 export default function StudentLayout({
@@ -11,6 +12,7 @@ export default function StudentLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
+    <RequireAuth>
     <div className="min-h-screen bg-gray-50">
       {/* Mobile sidebar backdrop */}
       <div
@@ -64,5 +66,6 @@ export default function StudentLayout({
         </main>
       </div>
     </div>
+    </RequireAuth>
   );
 }

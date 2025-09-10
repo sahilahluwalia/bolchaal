@@ -1,8 +1,3 @@
-interface TokenPair {
-  accessToken: string;
-  refreshToken: string;
-}
-
 class TokenManager {
   private static readonly ACCESS_TOKEN_KEY = 'access-token';
 
@@ -64,4 +59,3 @@ class TokenManager {
 }
 
 export { TokenManager };
-export type { TokenPair };

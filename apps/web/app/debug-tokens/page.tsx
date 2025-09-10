@@ -17,13 +17,7 @@ export default function TokenDebugPage() {
   };
 
   const handleRefresh = async () => {
-    try {
-      const result = await TokenDebugService.debugRefresh();
-      setRefreshResult(result.success ? '✅ Token refreshed successfully!' : `❌ Refresh failed: ${result.error}`);
-      checkTokens(); // Re-check status after refresh
-    } catch (error) {
-      setRefreshResult(`❌ Refresh error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    setRefreshResult('Refresh disabled: using 2h access tokens, no refresh flow.');
   };
 
   useEffect(() => {
@@ -60,9 +54,7 @@ export default function TokenDebugPage() {
 
             <div className="flex justify-between items-center">
               <span className="font-medium">Refresh Token:</span>
-              <span className="text-gray-600 font-medium">
-                🔒 HTTP-only (secure)
-              </span>
+              <span className="text-gray-600 font-medium">Not used</span>
             </div>
           </div>
 
@@ -90,30 +82,22 @@ export default function TokenDebugPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h2 className="text-xl font-semibold mb-4">How Token Refresh Works</h2>
+          <h2 className="text-xl font-semibold mb-4">Authentication Tokens</h2>
 
           <div className="space-y-4 text-sm text-gray-700">
             <div>
-              <strong>1. Automatic Refresh:</strong> When your access token expires, the system automatically detects 401 errors and triggers a refresh.
+              <strong>1. Access Token Only:</strong> We use a single JWT access token valid for 2 hours.
             </div>
 
             <div>
-              <strong>2. Refresh Process:</strong>
-              <ul className="list-disc list-inside ml-4 mt-2">
-                <li>Frontend detects expired token</li>
-                <li>Calls refreshToken mutation</li>
-                <li>Backend validates refresh token from HTTP cookie</li>
-                <li>Generates new access and refresh tokens</li>
-                <li>Updates database and sets new cookie</li>
-                <li>Frontend receives new access token</li>
-              </ul>
+              <strong>2. Renewal:</strong> After 2 hours, sign-in is required to obtain a new token.
             </div>
 
             <div>
               <strong>3. Troubleshooting:</strong>
               <ul className="list-disc list-inside ml-4 mt-2">
                 <li>Check browser console for errors</li>
-                <li>Verify refresh token cookie exists</li>
+                <li>Ensure you are signed in</li>
                 <li>Ensure backend server is running</li>
                 <li>Check network tab for failed requests</li>
               </ul>

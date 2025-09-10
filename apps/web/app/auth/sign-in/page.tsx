@@ -10,6 +10,7 @@ import { DemoAccountBox } from '@repo/ui/demo-account-box';
 import { trpc } from '../../_trpc/client';
 import { TRPCClientError } from '@trpc/client';
 import { TokenManager } from '../../../utils/auth';
+import { RedirectIfAuthenticated } from '../../components/require-auth';
 
 interface FormData {
   email: string;
@@ -94,6 +95,7 @@ export default function SignInPage() {
   };
 
   return (
+    <RedirectIfAuthenticated>
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 px-4 py-12 sm:px-6 lg:px-8">
       {/* BolChaal Logo */}
       <div className="absolute top-6 left-6 z-10">
@@ -190,5 +192,6 @@ export default function SignInPage() {
         </div>
       </div>
     </div>
+    </RedirectIfAuthenticated>
   );
 }
