@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@repo/ui/button";
 import { trpc } from "../_trpc/client";
+import Loader from "./loader";
 
 interface Message {
   id: string;
@@ -55,7 +56,7 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
   }, [messages]);
 
   // Fetch messages for this lesson
-  const { data: fetchedMessages } = trpc.getLessonMessages.useQuery(
+  const { data: fetchedMessages, isLoading, isFetching } = trpc.getLessonMessages.useQuery(
     { classroomId: classId, lessonId },
     { enabled: !!classId && !!lessonId }
   );
@@ -208,7 +209,14 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {messages.map((message) => (
+        {/* Initial load skeletons */}
+        {isLoading && (
+          <>
+            <Loader />
+          </>
+        )}
+
+        {!isLoading && messages.map((message) => (
           <div
             key={message.id}
             className={`flex w-full ${message.isOwn ? 'justify-end' : 'justify-start'}`}
@@ -255,6 +263,25 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
             </div>
           </div>
         ))}
+
+        {/* Typing / refetch indicator */}
+        {!isLoading && (isFetching || sendMutation.isPending) && (
+          <div className="flex w-full justify-start">
+            <div className="flex flex-col max-w-[280px] sm:max-w-xs md:max-w-sm lg:max-w-md xl:max-w-lg items-start">
+              <div className="flex items-center gap-2 mb-1 px-1">
+                <span className="text-xs font-medium text-gray-700">AI</span>
+              </div>
+              <div className="rounded-2xl px-4 py-3 shadow-sm bg-white text-gray-900 border border-gray-200 rounded-bl-md">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.2s]" />
+                  <span className="h-2 w-2 bg-gray-400 rounded-full animate-bounce" />
+                  <span className="h-2 w-2 bg-gray-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+                </div>
+              </div>
+              <div className="text-xs text-gray-500 mt-1 px-1">typing…</div>
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
