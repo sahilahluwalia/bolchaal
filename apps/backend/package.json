@@ -13,12 +13,11 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@ai-sdk/openai": "^2.0.25",
+    "@repo/queue": "workspace:*",
     "@repo/common-utils": "workspace:*",
     "@repo/db": "workspace:*",
     "@trpc/client": "^11.5.1",
     "@trpc/server": "^11.5.1",
-    "ai": "^5.0.39",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "jose": "^6.1.0",

@@ -17,10 +17,11 @@ import {
 import { TRPCError } from "@trpc/server";
 import { generateToken } from "../utils/auth";
 import { randomBytes } from "crypto";
-import "dotenv/config";
+import { dotenv } from "@repo/common-utils";
 import cors from "cors";
 import { ai } from "@repo/common-utils";
 const { generateObject } = ai;
+dotenv.config();
 
 export const appRouter = router({
   hello: publicProcedure.query(() => {
