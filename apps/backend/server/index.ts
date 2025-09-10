@@ -15,63 +15,12 @@ import {
   LessonResultSchema,
 } from "@repo/db/client";
 import { TRPCError } from "@trpc/server";
-import {
-  generateToken,
-  generateTokenPair,
-  verifyRefreshToken,
-} from "../utils/auth";
+import { generateToken } from "../utils/auth";
 import { randomBytes } from "crypto";
 import "dotenv/config";
 import cors from "cors";
-import { generateText, generateObject } from "ai";
-
-const createRefreshTokenCookie = (refreshToken: string): string => {
-  const isProduction = process.env.NODE_ENV === "production";
-  const crossSite = process.env.CROSS_SITE_COOKIES === "true";
-  const maxAge = 7 * 24 * 60 * 60; // 7 days
-
-  const cookieParts = [
-    `refreshToken=${refreshToken}`,
-    "HttpOnly",
-    "Path=/",
-    `Max-Age=${maxAge}`,
-  ];
-
-  if (crossSite) {
-    cookieParts.push("SameSite=None");
-    if (isProduction) cookieParts.push("Secure");
-  } else {
-    if (isProduction) {
-      cookieParts.push("Secure");
-      cookieParts.push("SameSite=Strict");
-    } else {
-      cookieParts.push("SameSite=Lax");
-    }
-  }
-
-  return cookieParts.join("; ");
-};
-
-const clearRefreshTokenCookie = (): string => {
-  const isProduction = process.env.NODE_ENV === "production";
-  const crossSite = process.env.CROSS_SITE_COOKIES === "true";
-
-  const cookieParts = ["refreshToken=", "HttpOnly", "Path=/", "Max-Age=0"];
-
-  if (crossSite) {
-    cookieParts.push("SameSite=None");
-    if (isProduction) cookieParts.push("Secure");
-  } else {
-    if (isProduction) {
-      cookieParts.push("Secure");
-      cookieParts.push("SameSite=Strict");
-    } else {
-      cookieParts.push("SameSite=Lax");
-    }
-  }
-
-  return cookieParts.join("; ");
-};
+import { ai } from "@repo/common-utils";
+const { generateObject } = ai;
 
 export const appRouter = router({
   hello: publicProcedure.query(() => {
@@ -121,22 +70,10 @@ export const appRouter = router({
         },
       });
 
-      const { accessToken, refreshToken } = await generateTokenPair({
+      const accessToken = await generateToken({
         id: user.id,
         role: user.role,
       });
-
-      // Store refresh token in database
-      await prismaClient.user.update({
-        where: { id: user.id },
-        data: {
-          refreshToken,
-          refreshTokenExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        },
-      });
-
-      // Set refresh token as HTTP-only cookie
-      ctx.res.setHeader("Set-Cookie", createRefreshTokenCookie(refreshToken));
 
       return {
         message: "Sign up successful",
@@ -209,19 +146,7 @@ export const appRouter = router({
           message: "Invalid email or password",
         });
 
-      const { accessToken, refreshToken } = await generateTokenPair(user);
-
-      // Store refresh token in database
-      await prismaClient.user.update({
-        where: { id: user.id },
-        data: {
-          refreshToken,
-          refreshTokenExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        },
-      });
-
-      // Set refresh token as HTTP-only cookie
-      ctx.res.setHeader("Set-Cookie", createRefreshTokenCookie(refreshToken));
+      const accessToken = await generateToken(user);
 
       return {
         message: "Sign in successful",
@@ -229,144 +154,9 @@ export const appRouter = router({
         role: user.role,
       };
     }),
-  refreshToken: publicProcedure
-    .output(
-      z.object({
-        accessToken: z.string(),
-      })
-    )
-    .mutation(async (opts) => {
-      const { ctx } = opts;
-
-      // Get refresh token from HTTP-only cookie
-      const cookies = ctx.req.headers.cookie;
-      if (!cookies) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "No refresh token found",
-        });
-      }
-
-      const refreshTokenCookie = cookies
-        .split(";")
-        .map((cookie) => cookie.trim())
-        .find((cookie) => cookie.startsWith("refreshToken="));
-
-      if (!refreshTokenCookie) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "No refresh token found",
-        });
-      }
-
-      const token = refreshTokenCookie.split("=")[1];
-
-      if (!token) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Invalid refresh token format",
-        });
-      }
-
-      // Verify the refresh token
-      const payload = await verifyRefreshToken(token);
-
-      // Check if user exists and refresh token matches
-      const user = await prismaClient.user.findUnique({
-        where: { id: payload.userId },
-        select: {
-          id: true,
-          role: true,
-          refreshToken: true,
-          refreshTokenExpiresAt: true,
-        },
-      });
-
-      if (!user || user.refreshToken !== token) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Invalid refresh token",
-        });
-      }
-
-      // Check if refresh token is expired
-      if (
-        !user.refreshTokenExpiresAt ||
-        user.refreshTokenExpiresAt < new Date()
-      ) {
-        throw new TRPCError({
-          code: "UNAUTHORIZED",
-          message: "Refresh token expired",
-        });
-      }
-
-      // Generate new token pair
-      const { accessToken, refreshToken: newRefreshToken } =
-        await generateTokenPair({
-          id: user.id,
-          role: user.role,
-        });
-
-      // Update refresh token in database
-      await prismaClient.user.update({
-        where: { id: user.id },
-        data: {
-          refreshToken: newRefreshToken,
-          refreshTokenExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
-        },
-      });
-
-      // Set new refresh token as HTTP-only cookie
-      ctx.res.setHeader(
-        "Set-Cookie",
-        createRefreshTokenCookie(newRefreshToken)
-      );
-
-      return {
-        accessToken,
-      };
-    }),
-  logout: publicProcedure.mutation(async (opts) => {
-    const { ctx } = opts;
-
-    // Get refresh token from HTTP-only cookie
-    const cookies = ctx.req.headers.cookie;
-    if (cookies) {
-      const refreshTokenCookie = cookies
-        .split(";")
-        .map((cookie) => cookie.trim())
-        .find((cookie) => cookie.startsWith("refreshToken="));
-
-      if (refreshTokenCookie) {
-        const token = refreshTokenCookie.split("=")[1];
-
-        if (!token) {
-          console.log("Invalid refresh token format in logout");
-          return { message: "Logged out successfully" };
-        }
-
-        // Verify the refresh token to get user ID
-        try {
-          const payload = await verifyRefreshToken(token);
-
-          // Clear refresh token from database
-          await prismaClient.user.update({
-            where: { id: payload.userId },
-            data: {
-              refreshToken: null,
-              refreshTokenExpiresAt: null,
-            },
-          });
-        } catch (error) {
-          // If token verification fails, still continue with logout
-          console.log("Invalid refresh token during logout:", error);
-        }
-      }
-    }
-
-    // Clear refresh token cookie
-    ctx.res.setHeader("Set-Cookie", clearRefreshTokenCookie());
-
+  // refreshToken endpoint removed; JWTs are long-lived (2 hours) and not refreshed
+  logout: publicProcedure.mutation(async () => {
+    // Stateless logout when only using access tokens
     return { message: "Logged out successfully" };
   }),
   generateAILessonContent: publicProcedure
@@ -1676,21 +1466,7 @@ export const appRouter = router({
         },
       });
 
-      const { accessToken, refreshToken } = await generateTokenPair({
-        id: user.id,
-        role: user.role,
-      });
-      await prismaClient.user.update({
-        where: { id: user.id },
-        data: {
-          refreshToken,
-          refreshTokenExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-        },
-      });
-      opts.ctx.res.setHeader(
-        "Set-Cookie",
-        createRefreshTokenCookie(refreshToken)
-      );
+      const accessToken = await generateToken({ id: user.id, role: user.role });
 
       return { message: "Sign up successful", accessToken, role: user.role };
     }),

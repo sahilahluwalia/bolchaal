@@ -24,8 +24,8 @@ const isAuthed = t.middleware(async ({ ctx, next }) => {
     const payload = await verifyToken(token);
     return next({
       ctx: {
-        userId: payload.sub.id,
-        userRole: payload.sub.role,
+        userId: payload.user.id,
+        userRole: payload.user.role,
       },
     });
   } catch {
