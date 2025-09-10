@@ -188,6 +188,7 @@ model Message {
   senderId      String?
   chatSessionId String
   classroomId   String
+  lessonId      String
   isBot         Boolean     @default(false)
   aiPrompt      String?
   aiResponse    String?
@@ -201,6 +202,9 @@ model Message {
 
   @@index([classroomId])
   @@index([chatSessionId])
+  @@index([lessonId])
+  @@index([classroomId, lessonId])
+  @@index([lessonId, chatSessionId])
   @@map("messages")
 }
 
