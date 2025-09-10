@@ -65,7 +65,6 @@ model Classroom {
   teacherId   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   teacher         User               @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
   rubrics         Rubric[]
   enrollments     StudentClassroom[]
@@ -200,14 +199,16 @@ model Message {
   chatSession ChatSession        @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
   attachment  MessageAttachment?
 
+  @@index([classroomId])
+  @@index([chatSessionId])
   @@map("messages")
 }
 
 model Invitation {
   id          String           @id @default(uuid())
   token       String           @unique // Unique URL token (like "abc123def")
-  email       String // Email of invited student
-  classroomId String // Which class they're invited to
+  email       String? // Optional email of invited student (if link-based invite)
+  classroomId String? // Optional class they're invited to; null => invite under teacher
   invitedById String // Which teacher sent invitation
   recipientId String? // Student who accepted (null until accepted)
   status      InvitationStatus @default(PENDING)
@@ -215,7 +216,7 @@ model Invitation {
   createdAt   DateTime         @default(now())
   acceptedAt  DateTime? // When student accepted
 
-  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  classroom Classroom? @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   invitedBy User      @relation("SentInvitations", fields: [invitedById], references: [id], onDelete: Cascade)
   recipient User?     @relation("InvitationRecipient", fields: [recipientId], references: [id])
 
