@@ -6,6 +6,7 @@ import { useState } from "react";
 import { cn } from "../../utils/cn";
 import { TokenManager } from "../../utils/auth";
 import { useUserProfile } from "../../utils/hooks";
+import { trpc } from "../_trpc/client";
 
 interface StudentSidebarProps {
   className?: string;
@@ -28,19 +29,17 @@ export function StudentSidebar({ className }: StudentSidebarProps) {
     }
   };
 
-  // Mock data for classes joined
-  const classesJoined = [
-    { id: "math101", name: "Mathematics 101", teacher: "Mr. Johnson", unreadCount: 2 },
-    { id: "physics", name: "Physics Lab", teacher: "Dr. Smith", unreadCount: 0 },
-    { id: "chemistry", name: "Chemistry Basics", teacher: "Ms. Davis", unreadCount: 5 },
-  ];
+  // Load real classrooms the student joined
+  const { data: myClassrooms, isLoading: loadingClasses } = trpc.getMyClassrooms.useQuery();
+  type MyClassroom = { id: string; name: string; teacherName?: string | null };
+  const classesJoined = ((myClassrooms || []) as MyClassroom[]).map((c) => ({
+    id: c.id,
+    name: c.name,
+    teacher: c.teacherName || "Teacher",
+    unreadCount: 0,
+  }));
 
-  // Mock data for chats
-  const chats = [
-    { id: "chat1", name: "Mathematics Study Group", lastMessage: "Hey everyone, need help with...", timestamp: "2 min ago", unreadCount: 3 },
-    { id: "chat2", name: "Physics Lab Team", lastMessage: "Don't forget the lab report", timestamp: "1 hour ago", unreadCount: 1 },
-    { id: "chat3", name: "Chemistry Discussion", lastMessage: "Great work on the project!", timestamp: "3 hours ago", unreadCount: 0 },
-  ];
+  // Chats list removed; class list acts as entry to lesson chats
 
   const navigationItems = [
     {
@@ -143,79 +142,47 @@ export function StudentSidebar({ className }: StudentSidebarProps) {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-900">Classes Joined</h3>
               <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                {classesJoined.length}
+                {loadingClasses ? 0 : classesJoined.length}
               </span>
             </div>
             <div className="space-y-2 max-h-48 overflow-y-auto">
-              {classesJoined.map((classroom) => (
-                <Link
-                  key={classroom.id}
-                  href={`/dashboard/student/chats?class=${classroom.id}`}
-                  className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white font-bold text-xs">
-                      {classroom.name.split(' ').map(word => word[0]).join('').toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {classroom.name}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {classroom.teacher}
-                    </p>
-                  </div>
-                  {classroom.unreadCount > 0 && (
-                    <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full flex-shrink-0">
-                      {classroom.unreadCount}
-                    </span>
-                  )}
-                </Link>
-              ))}
+              {loadingClasses ? (
+                <div className="text-xs text-gray-500 px-2 py-1">Loading...</div>
+              ) : classesJoined.length === 0 ? (
+                <div className="text-xs text-gray-500 px-2 py-1">No classes yet</div>
+              ) : (
+                classesJoined.map((classroom) => (
+                  <Link
+                    key={classroom.id}
+                    href={`/dashboard/student/chats/class/${classroom.id}`}
+                    className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-bold text-xs">
+                        {classroom.name.split(' ').map(word => word[0]).join('').toUpperCase()}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {classroom.name}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {classroom.teacher}
+                      </p>
+                    </div>
+                    {classroom.unreadCount > 0 && (
+                      <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full flex-shrink-0">
+                        {classroom.unreadCount}
+                      </span>
+                    )}
+                  </Link>
+                ))
+              )}
             </div>
           </div>
         )}
 
-        {/* Chats Section */}
-        {!isCollapsed && (
-          <div className="mt-6">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-900">Chats</h3>
-              <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                {chats.length}
-              </span>
-            </div>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {chats.map((chat) => (
-                <Link
-                  key={chat.id}
-                  href={`/dashboard/student/chats?chat=${chat.id}`}
-                  className="flex items-center gap-3 p-2 rounded-md hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <div className="h-8 w-8 rounded-full bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center flex-shrink-0">
-                    <span className="text-white font-bold text-xs">
-                      {chat.name.split(' ').map(word => word[0]).join('').toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">
-                      {chat.name}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {chat.lastMessage}
-                    </p>
-                  </div>
-                  {chat.unreadCount > 0 && (
-                    <span className="bg-red-500 text-white text-xs px-1.5 py-0.5 rounded-full flex-shrink-0">
-                      {chat.unreadCount}
-                    </span>
-                  )}
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Chats Section removed (use class list instead) */}
       </nav>
 
       {/* Footer */}
