@@ -1,6 +1,6 @@
 import { ProfileSettingsCard } from "../../../components/profile-settings-card";
 
-export default function TeacherSettingsPage() {
+export default function StudentSettingsPage() {
   return (
     <div className="space-y-6">
       <div>
