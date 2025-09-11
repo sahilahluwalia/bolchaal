@@ -82,33 +82,53 @@ export const appRouter = router({
         role: user.role,
       };
     }),
-  chat: publicProcedure
+  chat: privateProcedure
     .input(
       z.object({
-        purpose: z.string(),
-        keyVocabulary: z.string(),
-        keyGrammar: z.string(),
-        studentTask: z.string(),
-        otherInstructions: z.string(),
+        classroomId: z.string(),
+        lessonId: z.string(),
+        content: z.string(),
+        type: z.enum(["TEXT", "AUDIO"]),
       })
     )
-    .mutation((opts) => {
-      const { input: message } = opts;
+    .mutation(async (opts) => {
+      const {
+        input: { classroomId, lessonId, content },
+        ctx: { userId },
+      } = opts;
+
+      const lesson = await prismaClient.lesson.findFirst({
+        where: { id: lessonId },
+      });
+
+      if (!lesson) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
+      }
+
       const {
         purpose,
         keyVocabulary,
         keyGrammar,
         studentTask,
         otherInstructions,
-      } = message;
-      const prompt = systemPrompt({
+      } = lesson;
+      const prompt = Prompts.systemPrompt.AIStudentConversationPrompt({
         purpose,
         keyVocabulary,
         keyGrammar,
         studentTask,
         otherInstructions,
       });
-      return { prompt };
+      // const result = await generateObject({
+      //   model: "gpt-4.1-nano",
+      //   schema: z.object({
+      //     content: z.string(),
+      //   }),
+      //   system: prompt,
+      //   messages: [{ role: "user", content }],
+      // });
+
+      // return { content: result.object.content };
     }),
 
   signIn: publicProcedure
@@ -1318,7 +1338,7 @@ export const appRouter = router({
 
       const token = randomBytes(12).toString("hex");
       const hours = expiresInHours ?? 24 * 7;
-      const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
+      const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000 * 64);
 
       const invitation = await prismaClient.invitation.create({
         data: {
