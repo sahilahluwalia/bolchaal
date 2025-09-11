@@ -146,6 +146,7 @@ model ChatSession {
   id          String            @id @default(uuid())
   studentId   String
   classroomId String
+  lessonId    String           
   status      ChatSessionStatus @default(ACTIVE)
   startedAt   DateTime          @default(now())
   endedAt     DateTime?
@@ -159,9 +160,10 @@ model ChatSession {
   StudentClassroom   StudentClassroom? @relation(fields: [studentClassroomId], references: [id])
   studentClassroomId String?
 
-  @@unique([studentId, classroomId])
+  @@unique([studentId, classroomId, lessonId])
   @@index([studentId])
   @@index([classroomId])
+  @@index([lessonId])
   @@map("chat-sessions")
 }
 
@@ -185,8 +187,8 @@ model Message {
   content       String?
   messageType   MessageType @default(TEXT)
   attachmentId  String?
-  senderId      String?
-  chatSessionId String
+  senderId      String      @default("bot")
+  chatSessionId String?
   classroomId   String
   lessonId      String
   isBot         Boolean     @default(false)
@@ -197,7 +199,7 @@ model Message {
 
   sender      User?              @relation(fields: [senderId], references: [id], onDelete: Cascade)
   classroom   Classroom          @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  chatSession ChatSession        @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+  chatSession ChatSession?        @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
   attachment  MessageAttachment?
 
   @@index([classroomId])
