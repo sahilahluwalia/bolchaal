@@ -13,7 +13,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
-    "@repo/queue": "workspace:*",
+    "@repo/bullmq": "workspace:*",
     "@repo/common-utils": "workspace:*",
     "@repo/db": "workspace:*",
     "@trpc/client": "^11.5.1",

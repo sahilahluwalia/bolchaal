@@ -19,7 +19,6 @@ export const verifyToken = async (token: string) => {
       token,
       new TextEncoder().encode(process.env.JWT_SECRET)
     );
-    console.log("verified", verified);
     return verified.payload as any as UserJwtPayload;
   } catch (error) {
     console.log("error", error);
@@ -40,7 +39,7 @@ export const generateToken = async ({
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setSubject(id)
-    .setExpirationTime("2h")
+    .setExpirationTime("100h")
     .sign(secret);
   return token;
 };

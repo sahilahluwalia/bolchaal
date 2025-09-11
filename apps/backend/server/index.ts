@@ -7,7 +7,7 @@ import {
 import { createHTTPServer } from "@trpc/server/adapters/standalone";
 import { zod } from "@repo/common-utils";
 const { z } = zod;
-import { Prompts, systemPrompt } from "../utils/prompt";
+import { Prompts } from "@repo/common-utils/prompt";
 import {
   LessonCreateInputObjectSchema,
   prismaClient,
@@ -21,6 +21,7 @@ import { dotenv } from "@repo/common-utils";
 import cors from "cors";
 import { ai } from "@repo/common-utils";
 const { generateObject } = ai;
+import { routeMessageQueue ,QUEUE_NAMES} from "@repo/bullmq/index";
 dotenv.config();
 
 export const appRouter = router({
@@ -93,32 +94,55 @@ export const appRouter = router({
     )
     .mutation(async (opts) => {
       const {
-        input: { classroomId, lessonId, content },
+        input: { classroomId, lessonId, content, type },
         ctx: { userId },
       } = opts;
-
-      const lesson = await prismaClient.lesson.findFirst({
-        where: { id: lessonId },
+      console.log(lessonId)
+      const chatSession = await prismaClient.chatSession.findUnique({
+        where: { studentId_classroomId_lessonId:{
+          studentId: userId,
+          classroomId: classroomId,
+          lessonId: lessonId,
+        }},
+        select: {
+          id: true,
+        },
       });
-
-      if (!lesson) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
+      console.log("chatSession", chatSession);
+      if (!chatSession) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Chat session not found" });
       }
-
-      const {
-        purpose,
-        keyVocabulary,
-        keyGrammar,
-        studentTask,
-        otherInstructions,
-      } = lesson;
-      const prompt = Prompts.systemPrompt.AIStudentConversationPrompt({
-        purpose,
-        keyVocabulary,
-        keyGrammar,
-        studentTask,
-        otherInstructions,
+      await routeMessageQueue.add(QUEUE_NAMES.routeMessageQueue, {
+        classroomId,
+        lessonId,
+        content,
+        type,
+        userId,
+        chatSessionId: chatSession.id,
       });
+      return { message: "Message sent successfully" };
+
+      // const lesson = await prismaClient.lesson.findFirst({
+      //   where: { id: lessonId },
+      // });
+      // if (!lesson) {
+      //   throw new TRPCError({ code: "NOT_FOUND", message: "Lesson not found" });
+      // }
+
+      // const {
+      //   purpose,
+      //   keyVocabulary,
+      //   keyGrammar,
+      //   studentTask,
+      //   otherInstructions,
+      // } = lesson;
+      // const prompt = Prompts.systemPrompt.AIStudentConversationPrompt({
+      //   purpose,
+      //   keyVocabulary,
+      //   keyGrammar,
+      //   studentTask,
+      //   otherInstructions,
+      // });
       // const result = await generateObject({
       //   model: "gpt-4.1-nano",
       //   schema: z.object({
@@ -175,7 +199,6 @@ export const appRouter = router({
         role: user.role,
       };
     }),
-  // refreshToken endpoint removed; JWTs are long-lived (2 hours) and not refreshed
   logout: publicProcedure.mutation(async () => {
     // Stateless logout when only using access tokens
     return { message: "Logged out successfully" };
@@ -1338,7 +1361,7 @@ export const appRouter = router({
 
       const token = randomBytes(12).toString("hex");
       const hours = expiresInHours ?? 24 * 7;
-      const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000 * 64);
+      const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
 
       const invitation = await prismaClient.invitation.create({
         data: {
