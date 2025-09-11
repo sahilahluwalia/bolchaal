@@ -3,6 +3,7 @@ import {
   router,
   privateProcedure,
   createTRPCContext,
+  AppContext,
 } from "./trpc";
 import { createHTTPServer } from "@trpc/server/adapters/standalone";
 import { zod } from "@repo/common-utils";
@@ -23,6 +24,9 @@ import { ai } from "@repo/common-utils";
 const { generateObject } = ai;
 import { routeMessageQueue ,QUEUE_NAMES} from "@repo/bullmq/index";
 dotenv.config();
+import { applyWSSHandler } from "@trpc/server/adapters/ws";
+import ws from "ws";
+import { observable } from "@trpc/server/observable";
 
 export const appRouter = router({
   hello: publicProcedure.query(() => {
@@ -83,6 +87,15 @@ export const appRouter = router({
         role: user.role,
       };
     }),
+    test: publicProcedure.subscription(async (opts) => {
+      
+      return observable((subscriber) => {
+        setInterval(() => {
+          subscriber.next(Math.random());
+        }, 1000);
+      }); 
+    }),
+    
   chat: privateProcedure
     .input(
       z.object({
@@ -1167,22 +1180,32 @@ export const appRouter = router({
         orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
       });
 
+      const chatSessions = await prismaClient.chatSession.findMany({
+        where: { classroomId ,studentId: opts.ctx.userId},
+        select: {
+          id: true,
+          lessonId: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
       return classroomLessons.map((cl) => ({
         id: cl.id,
         isActive: cl.isActive,
         lesson: cl.lesson,
+        chatSessionId: chatSessions.find((cs) => cs.lessonId === cl.lesson.id)?.id,
       }));
     }),
 
   // Fetch messages for a specific lesson within a classroom for the current student
   getLessonMessages: privateProcedure
-    .input(z.object({ classroomId: z.string(), lessonId: z.string() }))
+    .input(z.object({ classroomId: z.string(), lessonId: z.string(), chatSessionId: z.string() }))
     .query(async (opts) => {
       if (opts.ctx.userRole !== "STUDENT") {
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
-      const { classroomId, lessonId } = opts.input;
+      const { classroomId, lessonId, chatSessionId } = opts.input;
 
       // Ensure the student is enrolled and get the chat session
       const enrollment = await prismaClient.studentClassroom.findFirst({
@@ -1196,20 +1219,8 @@ export const appRouter = router({
         });
       }
 
-      const chatSession = await prismaClient.chatSession.upsert({
-        where: {
-          studentId_classroomId: {
-            studentId: opts.ctx.userId,
-            classroomId,
-          },
-        },
-        update: {},
-        create: { classroomId, studentId: opts.ctx.userId },
-        select: { id: true },
-      });
-
       const messages = await prismaClient.message.findMany({
-        where: { chatSessionId: chatSession!.id, lessonId },
+        where: { chatSessionId, lessonId },
         include: {
           attachment: true,
           sender: { select: { id: true, name: true } },
@@ -1236,6 +1247,7 @@ export const appRouter = router({
         classroomId: z.string(),
         lessonId: z.string(),
         content: z.string().min(1),
+        chatSessionId: z.string(),
       })
     )
     .mutation(async (opts) => {
@@ -1243,7 +1255,7 @@ export const appRouter = router({
         throw new TRPCError({ code: "FORBIDDEN" });
       }
 
-      const { classroomId, lessonId, content } = opts.input;
+      const { classroomId, lessonId, content, chatSessionId } = opts.input;
 
       // Ensure the student is enrolled and get/create chat session
       const enrollment = await prismaClient.studentClassroom.findFirst({
@@ -1257,23 +1269,12 @@ export const appRouter = router({
         });
       }
 
-      const chatSession = await prismaClient.chatSession.upsert({
-        where: {
-          studentId_classroomId: {
-            studentId: opts.ctx.userId,
-            classroomId,
-          },
-        },
-        update: {},
-        create: { classroomId, studentId: opts.ctx.userId },
-        select: { id: true },
-      });
 
       const created = await prismaClient.message.create({
         data: {
           content,
           senderId: opts.ctx.userId,
-          chatSessionId: chatSession!.id,
+          chatSessionId,
           classroomId,
           lessonId,
         },
@@ -1744,39 +1745,36 @@ const server = createHTTPServer({
 server.listen(3005, () => {
   console.log("http Server Running");
 });
-// import { applyWSSHandler } from "@trpc/server/adapters/ws";
-// import ws from "ws";
-// const wss = new ws.Server({
-//   port: 3006,
-// });
-// const handler = applyWSSHandler({
-//   wss,
-//   router: appRouter,
-//   createContext() {
-//     console.log("web socket");
-//     return {};
-//   },
-//   // Enable heartbeat messages to keep connection open (disabled by default)
-//   keepAlive: {
-//     enabled: true,
-//     // server ping message interval in milliseconds
-//     pingMs: 30000,
-//     // connection is terminated if pong message is not received in this many milliseconds
-//     pongWaitMs: 5000,
-//   },
-// });
-// wss.on("connection", (ws) => {
-//   console.log(`➕➕ Connection (${wss.clients.size})`);
-//   ws.once("close", () => {
-//     console.log(`➖➖ Connection (${wss.clients.size})`);
-//   });
-// });
-// console.log("✅ WebSocket Server listening on ws://localhost:3006");
-// process.on("SIGTERM", () => {
-//   console.log("SIGTERM");
-//   handler.broadcastReconnectNotification();
-//   wss.close();
-// });
+
+const wss = new ws.Server({
+  port: 3006,
+});
+const handler = applyWSSHandler({
+  wss,
+  router: appRouter,
+  createContext(opts): AppContext {
+    return {
+      req: opts.req,
+    };
+  },
+  keepAlive: {
+    enabled: true,
+    pingMs: 30000,
+    pongWaitMs: 5000,
+  },
+});
+wss.on("connection", (ws) => {
+  console.log(`➕➕ Connection (${wss.clients.size})`);
+  ws.once("close", () => {
+    console.log(`➖➖ Connection (${wss.clients.size})`);
+  });
+});
+console.log("✅ WebSocket Server listening on ws://localhost:3006");
+process.on("SIGTERM", () => {
+  console.log("SIGTERM");
+  handler.broadcastReconnectNotification();
+  wss.close();
+});
 
 // Export type router type signature,
 // NOT the router itself.

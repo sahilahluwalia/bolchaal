@@ -11,7 +11,7 @@ interface Message {
   sender: string;
   timestamp: Date;
   isOwn: boolean;
-  type: 'text' | 'audio';
+  type: "text" | "audio";
   audioUrl?: string;
 }
 
@@ -21,6 +21,7 @@ interface ChatInterfaceProps {
   lessonId: string;
   className?: string;
   isDisabled?: boolean;
+  chatSessionId: string;
 }
 
 // Types matching server response for getLessonMessages
@@ -31,11 +32,18 @@ interface ServerMessage {
   senderId: string | null;
   senderName: string | null;
   createdAt: string | Date;
-  messageType: 'TEXT' | 'AUDIO';
+  messageType: "TEXT" | "AUDIO";
   attachmentUrl: string | null;
 }
 
-export function ChatInterface({ chatName, classId, lessonId, className, isDisabled }: ChatInterfaceProps) {
+export function ChatInterface({
+  chatName,
+  classId,
+  lessonId,
+  className,
+  isDisabled,
+  chatSessionId,
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -56,31 +64,46 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
   }, [messages]);
 
   // Fetch messages for this lesson
-  const { data: fetchedMessages, isLoading, isFetching } = trpc.getLessonMessages.useQuery(
-    { classroomId: classId, lessonId },
+  const {
+    data: fetchedMessages,
+    isLoading,
+    isFetching,
+  } = trpc.getLessonMessages.useQuery(
+    { classroomId: classId, lessonId, chatSessionId },
     { enabled: !!classId && !!lessonId }
   );
 
   useEffect(() => {
     if (!fetchedMessages) return;
-    const mapped: Message[] = (fetchedMessages as ServerMessage[]).map((m: ServerMessage) => ({
-      id: m.id,
-      content: m.content || "",
-      sender: m.senderName || (m.isBot ? "AI" : "User"),
-      timestamp: new Date(m.createdAt),
-      isOwn: !m.isBot && !!m.senderId, // treat user-sent as own
-      type: m.messageType === 'AUDIO' ? 'audio' : 'text',
-      audioUrl: m.attachmentUrl ?? undefined,
-    }));
+    const mapped: Message[] = (fetchedMessages as ServerMessage[]).map(
+      (m: ServerMessage) => ({
+        id: m.id,
+        content: m.content || "",
+        sender: m.senderName || (m.isBot ? "AI" : "User"),
+        timestamp: new Date(m.createdAt),
+        isOwn: !m.isBot && !!m.senderId, // treat user-sent as own
+        type: m.messageType === "AUDIO" ? "audio" : "text",
+        audioUrl: m.attachmentUrl ?? undefined,
+      })
+    );
     setMessages(mapped);
   }, [fetchedMessages]);
 
   const utils = trpc.useUtils();
   const sendMutation = trpc.sendLessonMessage.useMutation({
     onSuccess: () => {
+      trpc.test.useSubscription(undefined, {
+        onData(n) {
+          console.log("number", n);
+        },
+      });
       // We rely on the refetch to replace the optimistic message with the server version
-      utils.getLessonMessages.invalidate({ classroomId: classId, lessonId });
-    }
+      utils.getLessonMessages.invalidate({
+        classroomId: classId,
+        lessonId,
+        chatSessionId,
+      });
+    },
   });
 
   const handleSendMessage = () => {
@@ -96,12 +119,17 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
     setMessages((prev) => [...prev, optimistic]);
     const toSend = newMessage;
     setNewMessage("");
-    sendMutation.mutate({ classroomId: classId, lessonId, content: toSend });
+    sendMutation.mutate({
+      classroomId: classId,
+      lessonId,
+      content: toSend,
+      chatSessionId,
+    });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (isDisabled) return;
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
@@ -126,7 +154,7 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
         const currentStream = mediaStreamRef.current;
 
         if (shouldSave && audioChunks.length > 0) {
-          const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+          const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
           const audioUrl = URL.createObjectURL(audioBlob);
 
           const message: Message = {
@@ -136,14 +164,14 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
             timestamp: new Date(),
             isOwn: true,
             type: "audio",
-            audioUrl
+            audioUrl,
           };
-          setMessages(prev => [...prev, message]);
+          setMessages((prev) => [...prev, message]);
         }
 
         // Stop all tracks to release microphone
         if (currentStream) {
-          currentStream.getTracks().forEach(track => track.stop());
+          currentStream.getTracks().forEach((track) => track.stop());
         }
 
         // Reset refs
@@ -157,10 +185,10 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
       setRecordingTime(0);
 
       recordingIntervalRef.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
+        setRecordingTime((prev) => prev + 1);
       }, 1000);
     } catch (error) {
-      console.error('Error accessing microphone:', error);
+      console.error("Error accessing microphone:", error);
     }
   };
 
@@ -179,11 +207,14 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
   const formatMessageTime = (timestamp: Date) => {
-    return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return timestamp.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   return (
@@ -192,16 +223,24 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
       <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
         <div className="h-10 w-10 rounded-full bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center">
           <span className="text-white font-bold text-sm">
-            {chatName.split(' ').map(word => word[0]).join('').toUpperCase()}
+            {chatName
+              .split(" ")
+              .map((word) => word[0])
+              .join("")
+              .toUpperCase()}
           </span>
         </div>
         <div className="flex-1">
           <h2 className="text-lg font-semibold text-gray-900">{chatName}</h2>
           <div className="h-5">
             {isDisabled ? (
-              <p className="text-sm text-amber-600">This lesson chat is inactive.</p>
+              <p className="text-sm text-amber-600">
+                This lesson chat is inactive.
+              </p>
             ) : (
-              <p className="text-sm text-green-600">This lesson chat is active.</p>
+              <p className="text-sm text-green-600">
+                This lesson chat is active.
+              </p>
             )}
           </div>
         </div>
@@ -216,53 +255,78 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
           </>
         )}
 
-        {!isLoading && messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex w-full ${message.isOwn ? 'justify-end' : 'justify-start'}`}
-          >
-            <div className={`flex flex-col max-w-[280px] sm:max-w-xs md:max-w-sm lg:max-w-md xl:max-w-lg ${message.isOwn ? 'items-end' : 'items-start'}`}>
-              {/* Message Header for received messages */}
-              {!message.isOwn && (
-                <div className="flex items-center gap-2 mb-1 px-1">
-                  <span className="text-xs font-medium text-gray-700">{message.sender}</span>
-                </div>
-              )}
-
-              {/* Message Bubble */}
+        {!isLoading &&
+          messages.map((message) => (
+            <div
+              key={message.id}
+              className={`flex w-full ${message.isOwn ? "justify-end" : "justify-start"}`}
+            >
               <div
-                className={`rounded-2xl px-4 py-3 shadow-sm ${
-                  message.isOwn
-                    ? 'bg-green-500 text-white rounded-br-md'
-                    : 'bg-white text-gray-900 border border-gray-200 rounded-bl-md'
-                }`}
+                className={`flex flex-col max-w-[280px] sm:max-w-xs md:max-w-sm lg:max-w-md xl:max-w-lg ${message.isOwn ? "items-end" : "items-start"}`}
               >
-                {message.type === 'text' ? (
-                  <p className="text-sm leading-relaxed break-words">{message.content}</p>
-                ) : (
-                  <div className="flex items-center gap-3 min-w-[200px]">
-                    <Button variant="ghost" size="sm" className={`p-1 ${message.isOwn ? 'hover:bg-green-600' : 'hover:bg-gray-100'}`}>
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z"/>
-                      </svg>
-                    </Button>
-                    <div className="flex-1">
-                      <div className={`w-full h-1 rounded ${message.isOwn ? 'bg-green-400' : 'bg-gray-300'}`}>
-                        <div className={`h-1 w-1/3 rounded ${message.isOwn ? 'bg-white' : 'bg-gray-600'}`}></div>
-                      </div>
-                    </div>
-                    <span className={`text-xs ${message.isOwn ? 'text-green-100' : 'text-gray-500'}`}>0:15</span>
+                {/* Message Header for received messages */}
+                {!message.isOwn && (
+                  <div className="flex items-center gap-2 mb-1 px-1">
+                    <span className="text-xs font-medium text-gray-700">
+                      {message.sender}
+                    </span>
                   </div>
                 )}
-              </div>
 
-              {/* Timestamp */}
-              <div className={`text-xs text-gray-500 mt-1 px-1 ${message.isOwn ? 'text-right' : 'text-left'}`}>
-                {formatMessageTime(message.timestamp)}
+                {/* Message Bubble */}
+                <div
+                  className={`rounded-2xl px-4 py-3 shadow-sm ${
+                    message.isOwn
+                      ? "bg-green-500 text-white rounded-br-md"
+                      : "bg-white text-gray-900 border border-gray-200 rounded-bl-md"
+                  }`}
+                >
+                  {message.type === "text" ? (
+                    <p className="text-sm leading-relaxed break-words">
+                      {message.content}
+                    </p>
+                  ) : (
+                    <div className="flex items-center gap-3 min-w-[200px]">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`p-1 ${message.isOwn ? "hover:bg-green-600" : "hover:bg-gray-100"}`}
+                      >
+                        <svg
+                          className="w-4 h-4"
+                          fill="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path d="M8 5v14l11-7z" />
+                        </svg>
+                      </Button>
+                      <div className="flex-1">
+                        <div
+                          className={`w-full h-1 rounded ${message.isOwn ? "bg-green-400" : "bg-gray-300"}`}
+                        >
+                          <div
+                            className={`h-1 w-1/3 rounded ${message.isOwn ? "bg-white" : "bg-gray-600"}`}
+                          ></div>
+                        </div>
+                      </div>
+                      <span
+                        className={`text-xs ${message.isOwn ? "text-green-100" : "text-gray-500"}`}
+                      >
+                        0:15
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Timestamp */}
+                <div
+                  className={`text-xs text-gray-500 mt-1 px-1 ${message.isOwn ? "text-right" : "text-left"}`}
+                >
+                  {formatMessageTime(message.timestamp)}
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
 
         {/* Typing / refetch indicator */}
         {!isLoading && (isFetching || sendMutation.isPending) && (
@@ -290,8 +354,15 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
         <div className="flex items-end gap-3 p-3 bg-gray-50 border border-gray-200 rounded-xl">
           {isDisabled ? (
             <div className="flex items-center justify-between w-full">
-              <span className="text-sm text-gray-600 flex-1">Chat is available only when the lesson is active.</span>
-              <Button variant="secondary" size="sm" disabled className="ml-3 shrink-0">
+              <span className="text-sm text-gray-600 flex-1">
+                Chat is available only when the lesson is active.
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled
+                className="ml-3 shrink-0"
+              >
                 Send
               </Button>
             </div>
@@ -299,8 +370,12 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
             <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2 flex-1">
                 <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                <span className="text-red-600 font-medium text-sm sm:text-base">Recording...</span>
-                <span className="text-red-500 text-sm">{formatTime(recordingTime)}</span>
+                <span className="text-red-600 font-medium text-sm sm:text-base">
+                  Recording...
+                </span>
+                <span className="text-red-500 text-sm">
+                  {formatTime(recordingTime)}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <Button
@@ -331,15 +406,16 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
                   placeholder="Type a message..."
                   rows={1}
                   className="w-full px-0 py-1 bg-transparent border-none outline-none resize-none text-sm placeholder:text-gray-500 leading-relaxed"
-                  style={{ 
-                    minHeight: '24px', 
-                    maxHeight: '120px',
-                    overflowY: newMessage.length > 100 ? 'auto' : 'hidden'
+                  style={{
+                    minHeight: "24px",
+                    maxHeight: "120px",
+                    overflowY: newMessage.length > 100 ? "auto" : "hidden",
                   }}
                   onInput={(e) => {
                     const target = e.target as HTMLTextAreaElement;
-                    target.style.height = 'auto';
-                    target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+                    target.style.height = "auto";
+                    target.style.height =
+                      Math.min(target.scrollHeight, 120) + "px";
                   }}
                 />
               </div>
@@ -351,8 +427,18 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
                   className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded-full"
                   title="Record voice message"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+                    />
                   </svg>
                 </Button>
                 <Button
@@ -362,8 +448,18 @@ export function ChatInterface({ chatName, classId, lessonId, className, isDisabl
                   size="sm"
                 >
                   <span className="hidden sm:inline">Send</span>
-                  <svg className="w-4 h-4 sm:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  <svg
+                    className="w-4 h-4 sm:hidden"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                    />
                   </svg>
                 </Button>
               </div>

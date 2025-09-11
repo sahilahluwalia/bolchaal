@@ -3,7 +3,14 @@ import { TRPCError, initTRPC } from "@trpc/server";
 import type { CreateHTTPContextOptions } from "@trpc/server/adapters/standalone";
 import { verifyToken } from "../utils/auth";
 
-export const createTRPCContext = (_opts: CreateHTTPContextOptions) => {
+
+export type AppContext = {
+  req: CreateHTTPContextOptions["req"];
+  res?: CreateHTTPContextOptions["res"];
+};
+
+
+export const createTRPCContext = (_opts: CreateHTTPContextOptions): AppContext => {
   const { req, res } = _opts;
   return {
     req,
