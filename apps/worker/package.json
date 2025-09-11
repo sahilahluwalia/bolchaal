@@ -20,5 +20,8 @@
     "bullmq": "^5.58.5",
     "ioredis": "^5.7.0",
     "tsx": "^4.20.5"
+  },
+  "exports": {
+    "./index": "./src/index.ts"
   }
 }

@@ -3,12 +3,15 @@ import IORedis, { Redis } from "ioredis";
 const connection = new IORedis({
   maxRetriesPerRequest: null,
 });
-
+import { prismaClient } from "@repo/db/client";
+import { Prompts } from "@repo/common-utils/prompt";
+import { zod } from "@repo/common-utils";
+const { z } = zod;
+import { ai } from "@repo/common-utils";
+const { generateObject } = ai;
 const pubRedis = new Redis();
 
 const pubSub = new Redis();
-
-
 
 // setInterval(() => {
 //     const message = { foo: Math.random() };
@@ -69,9 +72,9 @@ pubSub.subscribe(REDIS_CHANNELS.audioMessageChannel, REDIS_CHANNELS.textMessageC
   pubSub.on("message", (channel, message) => {
     console.log(`Received ${message} from ${channel}`);
   });
-//   pubSub.on("messageBuffer", (channel, message) => {
-//     console.log(channel, message);
-//   });
+  pubSub.on("messageBuffer", (channel, message) => {
+    console.log(channel, message);
+  });
 export const routeMessageQueue = new Queue(QUEUE_NAMES.routeMessageQueue, {
   connection,
 });
@@ -130,7 +133,7 @@ async function initializeQueues() {
 }
 
 // Initialize queues
-initializeQueues();
+// initializeQueues();
 
 type textPayload = {
   content: string;
@@ -141,6 +144,7 @@ type basePayload = {
   classroomId: string;
   lessonId: string;
   userId: string;
+  chatSessionId: string;
 };
 
 type audioPayload = {
@@ -154,6 +158,7 @@ type userMessagePayload = {
   content: string;
   type: "TEXT" | "AUDIO";
   userId: string;
+  chatSessionId: string;
 };
 
 type speechToTextPayload = {
@@ -163,14 +168,16 @@ type speechToTextPayload = {
   type: "AUDIO";
 };
 
-interface generateAIFeedbackPayloadForText extends textPayload, basePayload {
+interface GenerateAIFeedbackPayloadForText extends textPayload, basePayload {
   aiFeedback: string;
 }
 
-interface generateAIFeedbackPayloadForAudio extends audioPayload, basePayload {
-  aiFeedback: string;
+interface GenerateAIFeedbackPayloadForAudio extends audioPayload, basePayload {
+  content: string;
+  //   aiFeedback: string;
 }
-interface textToSpeechWorkerResponse extends generateAIFeedbackPayloadForAudio {
+
+interface TextToSpeechWorkerResponse extends GenerateAIFeedbackPayloadForAudio {
   url: string;
 }
 
@@ -234,7 +241,7 @@ const speechToTextWorker = new Worker(
 
 const textToSpeechWorker = new Worker(
   QUEUE_NAMES.textToSpeechQueue,
-  async (job: Job<generateAIFeedbackPayloadForAudio>) => {
+  async (job: Job<GenerateAIFeedbackPayloadForAudio>) => {
     // const whisper=openai
 
     // audio data from whisper
@@ -264,13 +271,56 @@ const generateAIFeedbackWorker = new Worker(
   QUEUE_NAMES.generateAIFeedbackQueue,
   async (
     job: Job<
-      generateAIFeedbackPayloadForText | generateAIFeedbackPayloadForAudio
+      GenerateAIFeedbackPayloadForText | GenerateAIFeedbackPayloadForAudio
     >
   ) => {
+    const { lessonId, content } = job.data;
+    console.log("generateAIFeedbackWorker job.data is ", job.data);
+    const lesson = await prismaClient.lesson.findUnique({
+      where: { id: lessonId },
+    });
+
+    if (!lesson) {
+      console.log("lesson not found for lessonId ", lessonId);
+      return "lesson not found for lessonId " + lessonId;
+    }
+    const {
+      purpose,
+      keyVocabulary,
+      keyGrammar,
+      studentTask,
+      otherInstructions,
+    } = lesson;
+    const prompt = Prompts.systemPrompt.AIStudentConversationPrompt({
+      purpose,
+      keyVocabulary,
+      keyGrammar,
+      studentTask,
+      otherInstructions,
+    });
+    console.log("text generation started");
+    let result
+    try{
+         result = await generateObject({
+            model: "gpt-4.1-nano",
+            schema: z.object({
+              content: z.string(),
+            }),
+            system: "You are a helpful assistant.   , reply in max 5 words",
+            //   system: prompt,
+            messages: [{ role: "user", content }],
+          });
+    }
+    catch(error){
+        console.log("error in text generation:", error);
+        return "error in text generation:" + error;
+    }
+    console.log("text generation finished");
+
     // console.log("generate ai feedback worker started");
     const aiFeedback = {
       ...job.data,
-      aiFeedback: "ai generated feedback",
+      aiFeedback: result.object.content,
     };
     console.log("generate ai feedback worker finished:", aiFeedback.aiFeedback);
 
@@ -279,13 +329,27 @@ const generateAIFeedbackWorker = new Worker(
         QUEUE_NAMES.saveAIResponseQueue,
         aiFeedback
       );
+     
+      const publishMessage={
+        aiFeedback: aiFeedback.aiFeedback,
+        chatSessionId: job.data.chatSessionId,
+        userId: job.data.userId,
+      }
+
+// publishMessage
+// {
+//     aiFeedback: "I'm doing well, thanks.",
+//     chatSessionId: 'c53f8b5b-8674-46e9-b2d8-e66d11bcd917',
+//     userId: 'e95d426e-7c0f-4eca-bab4-5af04cd0a2a1'
+//   }
+
       console.log(
         "publishing to client-message-channel text payload:",
-        aiFeedback.aiFeedback
+        publishMessage
       );
       pubRedis.publish(
         REDIS_CHANNELS.textMessageChannel,
-        JSON.stringify(aiFeedback)
+        JSON.stringify(publishMessage)
       );
     } else if (job.data.type === "AUDIO") {
       await textToSpeechQueue.add(QUEUE_NAMES.textToSpeechQueue, aiFeedback);
@@ -300,7 +364,21 @@ const generateAIFeedbackWorker = new Worker(
 const saveIncomingUserMessageToDBWorker = new Worker(
   QUEUE_NAMES.saveIncomingUserMessageToDBQueue,
   async (job: Job<userMessagePayload>) => {
+    if(job.data.type === "TEXT"){
     console.log("saving incoming user message to db:", job.data.content);
+
+    await prismaClient.message.create({
+      data: {
+        content: job.data.content,
+        chatSessionId: job.data.chatSessionId,
+        lessonId: job.data.lessonId,
+        classroomId: job.data.classroomId,
+        isBot: false,
+        messageType: job.data.type,
+          senderId: job.data.userId,
+        },
+      });
+    }
     return "save incoming user text to db worker Finished";
   },
   { connection }
@@ -309,32 +387,60 @@ const saveIncomingUserMessageToDBWorker = new Worker(
 const saveAIResponseWorker = new Worker(
   QUEUE_NAMES.saveAIResponseQueue,
   async (
-    job: Job<generateAIFeedbackPayloadForText | textToSpeechWorkerResponse>
+    job: Job<GenerateAIFeedbackPayloadForText | TextToSpeechWorkerResponse>
   ) => {
     // const result=prisma
     //   await saveIncomingUserTextToDBWorker.add("save-incoming-user-text-to-db", job.data);
     // console.log("save ai response to db", job.data);
     // cosnt db=prisma
+    // get chat session id from lesson id,student id and classroom id
+   
 
+    // data is  {
+    //     classroomId: 'd850a628-9617-4a46-9e7e-b536070c774a',
+    //     lessonId: 'f2db2114-378f-44aa-8d31-f61d7bd7ccb5',
+    //     content: 'How are you doing?',
+    //     type: 'TEXT',
+    //     userId: 'e95d426e-7c0f-4eca-bab4-5af04cd0a2a1',
+    //     aiFeedback: "I'm doing well, thanks."
+    //   }
     if (job.data.type === "AUDIO") {
       // save to db
-      console.log(
-        "save ai response ",
-        job.data.aiFeedback,
-        " of type ",
-        job.data.type,
-        " to db",
-        job.data.url
-      );
+      //   console.log(
+      //     "save ai response ",
+      //     job.data.aiFeedback,
+      //     " of type ",
+      //     job.data.type,
+      //     " to db",
+      //     job.data.url
+      //   );
     }
     if (job.data.type === "TEXT") {
-      console.log(
-        "saving ai response:",
-        job.data.aiFeedback,
-        " of type: ",
-        job.data.type,
-        " to db"
-      );
+      //  create 2 messages one for bot and one for user , in batch
+      const messages = await prismaClient.message.createMany({
+        data: [
+          {
+            content: job.data.aiFeedback,
+            chatSessionId: job.data.chatSessionId,
+            lessonId: job.data.lessonId,
+            classroomId: job.data.classroomId,
+            isBot: true,
+            messageType: "TEXT",
+            senderId: "bot",
+          },
+        //   {
+        //     content: job.data.content,
+        //     chatSessionId: chatSession!.id,
+        //     lessonId: job.data.lessonId,
+        //     classroomId: job.data.classroomId,
+        //     isBot: false,
+        //     messageType: "TEXT",
+        //     senderId: job.data.userId,
+        //   },
+        ],
+      });
+      console.log("messages completed in db:", messages);
+
     }
     return "save ai response worker Finished";
   },
