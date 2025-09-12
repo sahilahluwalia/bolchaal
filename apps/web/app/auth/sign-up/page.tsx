@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { InputField } from '@repo/ui/input-field';
 import { trpc } from '../../_trpc/client';
 import { TRPCClientError } from '@trpc/client';
 import { Button } from '@repo/ui/button';
@@ -149,66 +150,48 @@ export default function SignUpPage() {
               <div className="space-y-4">
                 {/* Name Field - Optional */}
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                    Full Name <span className="text-gray-400">(Optional)</span>
-                  </label>
-                  <input
+                  <InputField
                     id="name"
                     name="name"
                     type="text"
+                    label="Full Name (Optional)"
                     autoComplete="name"
                     value={formData.name}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
-                      errors.name ? 'border-red-300' : 'border-gray-300'
-                    }`}
                     placeholder="Enter your full name"
+                    error={errors.name}
                   />
-                  {errors.name && (
-                    <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-                  )}
                 </div>
 
                 {/* Email Field - Required */}
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                    Email Address <span className="text-red-500">*</span>
-                  </label>
-                  <input
+                  <InputField
                     id="email"
                     name="email"
                     type="email"
+                    label="Email Address"
                     autoComplete="email"
                     required
                     value={formData.email}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
-                      errors.email ? 'border-red-300' : 'border-gray-300'
-                    }`}
                     placeholder="Enter your email address"
+                    error={errors.email}
                   />
-                  {errors.email && (
-                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                  )}
                 </div>
 
                 {/* Password Field - Required */}
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                    Password <span className="text-red-500">*</span>
-                  </label>
-                  <input
+                  <InputField
                     id="password"
                     name="password"
                     type="password"
+                    label="Password"
                     autoComplete="new-password"
                     required
                     value={formData.password}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
-                      errors.password ? 'border-red-300' : 'border-gray-300'
-                    }`}
                     placeholder="Create a strong password"
+                    error={errors.password}
                   />
 
                   {/* Password Strength Indicator */}
@@ -233,33 +216,22 @@ export default function SignUpPage() {
                       )}
                     </p>
                   </div>
-
-                  {errors.password && (
-                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-                  )}
                 </div>
 
                 {/* Confirm Password Field - Required */}
                 <div>
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                    Confirm Password <span className="text-red-500">*</span>
-                  </label>
-                  <input
+                  <InputField
                     id="confirmPassword"
                     name="confirmPassword"
                     type="password"
+                    label="Confirm Password"
                     autoComplete="new-password"
                     required
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
-                    className={`w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
-                      errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
-                    }`}
                     placeholder="Confirm your password"
+                    error={errors.confirmPassword}
                   />
-                  {errors.confirmPassword && (
-                    <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
-                  )}
                 </div>
               </div>
 

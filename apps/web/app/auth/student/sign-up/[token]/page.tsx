@@ -6,6 +6,7 @@ import Link from "next/link";
 import { trpc } from "../../../../_trpc/client";
 import { TRPCClientError } from "@trpc/client";
 import { Button } from "@repo/ui/button";
+import { InputField } from "@repo/ui/input-field";
 import { TokenManager } from "../../../../../utils/auth";
 import Loader from "../../../../components/loader";
 
@@ -179,80 +180,46 @@ export default function StudentInviteSignUpPage() {
 
                     <div className="space-y-4">
                       <div>
-                        <label
-                          htmlFor="name"
-                          className="block text-sm font-medium text-gray-700 mb-1"
-                        >
-                          Full Name <span className="text-red-500">*</span>
-                        </label>
-                        <input
+                        <InputField
                           id="name"
                           name="name"
-                          type="text"
-                          autoComplete="name"
+                          label="Full Name"
                           required
+                          autoComplete="name"
                           value={formData.name}
                           onChange={handleInputChange}
-                          className={`w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
-                            errors.name ? "border-red-300" : "border-gray-300"
-                          }`}
                           placeholder="Enter your full name"
+                          error={errors.name}
                         />
-                        {errors.name && (
-                          <p className="mt-1 text-sm text-red-600">
-                            {errors.name}
-                          </p>
-                        )}
                       </div>
 
                       <div>
-                        <label
-                          htmlFor="email"
-                          className="block text-sm font-medium text-gray-700 mb-1"
-                        >
-                          Email Address <span className="text-red-500">*</span>
-                        </label>
-                        <input
+                        <InputField
                           id="email"
                           name="email"
                           type="email"
-                          autoComplete="email"
+                          label="Email Address"
                           required
+                          autoComplete="email"
                           value={formData.email}
                           onChange={handleInputChange}
-                          className={`w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
-                            errors.email ? "border-red-300" : "border-gray-300"
-                          }`}
                           placeholder="Enter your email address"
+                          error={errors.email}
                         />
-                        {errors.email && (
-                          <p className="mt-1 text-sm text-red-600">
-                            {errors.email}
-                          </p>
-                        )}
                       </div>
 
                       <div>
-                        <label
-                          htmlFor="password"
-                          className="block text-sm font-medium text-gray-700 mb-1"
-                        >
-                          Password <span className="text-red-500">*</span>
-                        </label>
-                        <input
+                        <InputField
                           id="password"
                           name="password"
                           type="password"
-                          autoComplete="new-password"
+                          label="Password"
                           required
+                          autoComplete="new-password"
                           value={formData.password}
                           onChange={handleInputChange}
-                          className={`w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
-                            errors.password
-                              ? "border-red-300"
-                              : "border-gray-300"
-                          }`}
                           placeholder="Create a strong password"
+                          error={errors.password}
                         />
                         <div className="mt-2">
                           <div className="flex items-center space-x-2">
@@ -274,41 +241,21 @@ export default function StudentInviteSignUpPage() {
                             </span>
                           </div>
                         </div>
-                        {errors.password && (
-                          <p className="mt-1 text-sm text-red-600">
-                            {errors.password}
-                          </p>
-                        )}
                       </div>
 
                       <div>
-                        <label
-                          htmlFor="confirmPassword"
-                          className="block text-sm font-medium text-gray-700 mb-1"
-                        >
-                          Confirm Password{" "}
-                          <span className="text-red-500">*</span>
-                        </label>
-                        <input
+                        <InputField
                           id="confirmPassword"
                           name="confirmPassword"
                           type="password"
-                          autoComplete="new-password"
+                          label="Confirm Password"
                           required
+                          autoComplete="new-password"
                           value={formData.confirmPassword}
                           onChange={handleInputChange}
-                          className={`w-full px-3 py-2 border rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors ${
-                            errors.confirmPassword
-                              ? "border-red-300"
-                              : "border-gray-300"
-                          }`}
                           placeholder="Confirm your password"
+                          error={errors.confirmPassword}
                         />
-                        {errors.confirmPassword && (
-                          <p className="mt-1 text-sm text-red-600">
-                            {errors.confirmPassword}
-                          </p>
-                        )}
                       </div>
                     </div>
 
