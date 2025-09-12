@@ -1,0 +1,3 @@
+-- Placeholder to match DB-applied migration 20250911155938_add_student_id_classroom_id_unique_in_chatsession
+-- No-op: this migration was applied on the database but missing locally.
+-- Keeping empty to align local migration history safely without data loss.
