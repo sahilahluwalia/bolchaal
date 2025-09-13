@@ -4,6 +4,7 @@ import {
   privateProcedure,
   createTRPCContext,
   AppContext,
+  // wsPrivateProcedure
 } from "./trpc";
 import { createHTTPServer } from "@trpc/server/adapters/standalone";
 import { zod } from "@repo/common-utils";
@@ -22,11 +23,29 @@ import { dotenv } from "@repo/common-utils";
 import cors from "cors";
 import { ai } from "@repo/common-utils";
 const { generateObject } = ai;
-import { routeMessageQueue ,QUEUE_NAMES} from "@repo/bullmq/index";
+import {
+  routeMessageQueue,
+  QUEUE_NAMES,
+  REDIS_CHANNELS,
+  pubSub,
+} from "@repo/bullmq/index";
 dotenv.config();
 import { applyWSSHandler } from "@trpc/server/adapters/ws";
 import ws from "ws";
 import { observable } from "@trpc/server/observable";
+
+
+const pubChannelName = `${REDIS_CHANNELS.textMessageChannel}` ;
+pubSub.subscribe(pubChannelName, (err) => {
+  console.log("subscribed to", pubChannelName);
+  if (err) console.error("Failed to subscribe:", err.message);
+});
+
+// send to frontend with websocket
+pubSub.on("message", (channel, message) => {
+  // {"aiFeedback":"Great to hear that!","chatSessionId":"a5e5915e-f6fb-4bef-9f59-f6f177b88732","userId":"bd1fc974-c133-4774-8923-0915ac22d2ea"}
+  console.log("BAckend: received message from", channel, message);
+});
 
 export const appRouter = router({
   hello: publicProcedure.query(() => {
@@ -87,15 +106,66 @@ export const appRouter = router({
         role: user.role,
       };
     }),
-    test: publicProcedure.subscription(async (opts) => {
+  chatWebSocket: privateProcedure
+    .input(
+      z.object({
+        chatSessionId: z.string(),
+      })
+    )
+    .subscription(async (opts) => {
+   
+      const {
+        input: { chatSessionId },
+      } = opts;
+      //check student is enrolled in this class
+      const chatSession = await prismaClient.chatSession.findFirst({
+        where: { id: chatSessionId, studentId: opts.ctx.userId },
+      });
+      if (!chatSession) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Chat session not found" });
+      }
       
-      return observable((subscriber) => {
-        setInterval(() => {
-          subscriber.next(Math.random());
-        }, 1000);
-      }); 
+      return observable<string>((subscriber) => {
+        // Create a message handler function
+        const messageHandler = (channel: string, message: string) => {
+          console.log("Backend: received message from backend in chatWebSocket", channel, message);
+          const data = JSON.parse(message);
+          console.log("Backend: received message from backend in chatWebSocket", data);
+          console.log("data.chatSessionId === chatSessionId", data.chatSessionId === chatSessionId);
+          if (data.chatSessionId === chatSessionId) {
+            subscriber.next(data.aiFeedback);
+          }
+        };
+
+        // Add the listener
+        pubSub.on("message", messageHandler);
+
+        // Return cleanup function
+        return () => {
+          console.log("Cleaning up chatWebSocket subscription for chatSessionId:", chatSessionId);
+          pubSub.off("message", messageHandler);
+        };
+    });
     }),
-    
+  test: privateProcedure.subscription((_opts) => {
+    return observable<number>((subscriber) => {
+      pubSub.subscribe(REDIS_CHANNELS.textMessageChannel, (err) => {
+        if (err) console.error("Failed to subscribe:", err.message);
+      });
+
+      const id = setInterval(() => {
+        try {
+          subscriber.next(Math.random());
+        } catch {}
+      }, 1000);
+
+      return () => {
+        clearInterval(id);
+        pubSub.unsubscribe(REDIS_CHANNELS.textMessageChannel).catch(() => {});
+      };
+    });
+  }),
+
   chat: privateProcedure
     .input(
       z.object({
@@ -103,35 +173,22 @@ export const appRouter = router({
         lessonId: z.string(),
         content: z.string(),
         type: z.enum(["TEXT", "AUDIO"]),
+        chatSessionId: z.string(),
       })
     )
     .mutation(async (opts) => {
       const {
-        input: { classroomId, lessonId, content, type },
+        input: { classroomId, lessonId, content, type, chatSessionId },
         ctx: { userId },
       } = opts;
-      console.log(lessonId)
-      const chatSession = await prismaClient.chatSession.findUnique({
-        where: { studentId_classroomId_lessonId:{
-          studentId: userId,
-          classroomId: classroomId,
-          lessonId: lessonId,
-        }},
-        select: {
-          id: true,
-        },
-      });
-      console.log("chatSession", chatSession);
-      if (!chatSession) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Chat session not found" });
-      }
+     
       await routeMessageQueue.add(QUEUE_NAMES.routeMessageQueue, {
         classroomId,
         lessonId,
         content,
         type,
         userId,
-        chatSessionId: chatSession.id,
+        chatSessionId,
       });
       return { message: "Message sent successfully" };
 
@@ -1181,7 +1238,7 @@ export const appRouter = router({
       });
 
       const chatSessions = await prismaClient.chatSession.findMany({
-        where: { classroomId ,studentId: opts.ctx.userId},
+        where: { classroomId, studentId: opts.ctx.userId },
         select: {
           id: true,
           lessonId: true,
@@ -1193,13 +1250,20 @@ export const appRouter = router({
         id: cl.id,
         isActive: cl.isActive,
         lesson: cl.lesson,
-        chatSessionId: chatSessions.find((cs) => cs.lessonId === cl.lesson.id)?.id,
+        chatSessionId: chatSessions.find((cs) => cs.lessonId === cl.lesson.id)
+          ?.id,
       }));
     }),
 
   // Fetch messages for a specific lesson within a classroom for the current student
   getLessonMessages: privateProcedure
-    .input(z.object({ classroomId: z.string(), lessonId: z.string(), chatSessionId: z.string() }))
+    .input(
+      z.object({
+        classroomId: z.string(),
+        lessonId: z.string(),
+        chatSessionId: z.string(),
+      })
+    )
     .query(async (opts) => {
       if (opts.ctx.userRole !== "STUDENT") {
         throw new TRPCError({ code: "FORBIDDEN" });
@@ -1218,7 +1282,26 @@ export const appRouter = router({
           message: "Not enrolled in classroom",
         });
       }
-
+      // check if chat session exists
+      const chatSession = await prismaClient.chatSession.findFirst({
+        where: { studentId: opts.ctx.userId, classroomId, lessonId },
+      });
+      if (!chatSession) {
+        // create chat session for faster response in message reply
+        await prismaClient.chatSession.create({
+          data: {
+            studentId: opts.ctx.userId,
+            classroomId,
+            lessonId,
+          },
+        });
+      }
+      if (!chatSession) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Chat session not found",
+        });
+      }
       const messages = await prismaClient.message.findMany({
         where: { chatSessionId, lessonId },
         include: {
@@ -1268,7 +1351,6 @@ export const appRouter = router({
           message: "Not enrolled in classroom",
         });
       }
-
 
       const created = await prismaClient.message.create({
         data: {
@@ -1629,51 +1711,72 @@ export const appRouter = router({
         throw new TRPCError({ code: "FORBIDDEN" });
       const { classroomId, studentId } = opts.input;
 
-      const classroom = await prismaClient.classroom.findFirst({
-        where: { id: classroomId, teacherId: opts.ctx.userId },
-      });
-      if (!classroom)
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Classroom not found",
+      const result = await prismaClient.$transaction(async (tx) => {
+        const classroom = await tx.classroom.findFirst({
+          where: { id: classroomId, teacherId: opts.ctx.userId },
+          select: { id: true },
+        });
+        if (!classroom)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Classroom not found",
+          });
+
+        const student = await tx.user.findFirst({
+          where: { id: studentId, role: "STUDENT" },
+          select: { id: true },
+        });
+        if (!student)
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Student not found",
+          });
+
+        const enrollment = await (async () => {
+          try {
+            return await tx.studentClassroom.create({
+              data: { classroomId, studentId },
+            });
+          } catch (e: any) {
+            if (e?.code === "P2002") {
+              throw new TRPCError({
+                code: "CONFLICT",
+                message: "Student already enrolled in classroom",
+              });
+            }
+            throw e;
+          }
+        })();
+
+        const activeLessons = await tx.classroomLesson.findMany({
+          where: { classroomId, isActive: true },
+          select: { lessonId: true },
         });
 
-      const student = await prismaClient.user.findFirst({
-        where: { id: studentId, role: "STUDENT" },
-      });
-      if (!student)
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Student not found",
-        });
+        if (activeLessons.length > 0) {
+          await tx.chatSession.createMany({
+            data: activeLessons.map((l) => ({
+              studentId,
+              classroomId,
+              lessonId: l.lessonId,
+              studentClassroomId: enrollment.id,
+            })),
+            skipDuplicates: true,
+          });
+        } else {
+          await tx.chatSession.create({
+            data: {
+              studentId,
+              classroomId,
+              studentClassroomId: enrollment.id,
+            },
+          });
+        }
 
-      const exists = await prismaClient.studentClassroom.findFirst({
-        where: { classroomId, studentId },
-      });
-      if (exists) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "Student already enrolled in classroom",
-        });
-      }
-
-      const enrollment = await prismaClient.studentClassroom.create({
-        data: { classroomId, studentId },
+        return enrollment;
       });
 
-      // Ensure a ChatSession record exists for this student and classroom
-      // (unique on [studentId, classroomId])
-      await prismaClient.chatSession.upsert({
-        where: {
-          studentId_classroomId: {
-            studentId,
-            classroomId,
-          },
-        },
-        update: {},
-        create: { classroomId, studentId },
-      });
-      return enrollment;
+      return result;
     }),
   /**
    * Detach a student from a classroom
@@ -1728,6 +1831,27 @@ export const appRouter = router({
       endedAt: chatSession.endedAt,
     }));
   }),
+  getTeacherOverviewCounts: privateProcedure.query(async (opts) => {
+    if (opts.ctx.userRole !== "TEACHER") {
+      throw new TRPCError({ code: "FORBIDDEN" });
+    }
+
+    const teacherId = opts.ctx.userId;
+
+    const [
+      totalClassrooms,
+      totalStudents,
+      totalLessons,
+      totalMessages,
+    ] = await Promise.all([
+      prismaClient.classroom.count({ where: { teacherId } }),
+      prismaClient.studentClassroom.count({ where: { classroom: { teacherId } } }),
+      prismaClient.lesson.count({ where: { teacherId } }),
+      prismaClient.message.count({ where: { classroom: { teacherId } } }),
+    ]);
+
+    return { totalClassrooms, totalStudents, totalLessons, totalMessages };
+  }),
 });
 
 const server = createHTTPServer({
@@ -1736,33 +1860,43 @@ const server = createHTTPServer({
     credentials: true, // Allow cookies to be sent
   }),
   router: appRouter,
-  createContext: createTRPCContext,
-  // createContext: (opts) => {
-  //   return createTRPCContext(opts);
-  // },
+  createContext: (opts) => {
+    return createTRPCContext(opts);
+  },
 });
 
 server.listen(3005, () => {
   console.log("http Server Running");
 });
 
+import type { CreateWSSContextFnOptions } from "@trpc/server/adapters/ws";
+export const createWSSContext = async (
+  opts: CreateWSSContextFnOptions
+): Promise<AppContext> => {
+  // is ws , token is different location than http
+  const token: string | undefined =
+    opts.info.connectionParams?.Authorization?.split(" ")[1];
+  const req = opts.req as AppContext["req"];
+  if (token) {
+    // Ensure auth middleware can read the token from headers
+    (req.headers as any).authorization = `Bearer ${token}`;
+  }
+  return { req };
+};
 const wss = new ws.Server({
   port: 3006,
 });
 const handler = applyWSSHandler({
   wss,
   router: appRouter,
-  createContext(opts): AppContext {
-    return {
-      req: opts.req,
-    };
-  },
+  createContext: createWSSContext,
   keepAlive: {
     enabled: true,
     pingMs: 30000,
     pongWaitMs: 5000,
   },
 });
+
 wss.on("connection", (ws) => {
   console.log(`➕➕ Connection (${wss.clients.size})`);
   ws.once("close", () => {

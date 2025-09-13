@@ -1,10 +1,10 @@
-import { UserRoleSchema } from "@repo/db/client";
+import { UserRoleSchema, UserRole } from "@repo/db/client";
 
 interface UserJwtPayload {
   sub: string;
   user: {
     id: string;
-    role: typeof UserRoleSchema;
+    role: UserRole;
   };
   iat: number;
   exp: number;
@@ -31,7 +31,7 @@ export const generateToken = async ({
   role,
 }: {
   id: string;
-  role: typeof UserRoleSchema;
+  role: UserRole;
 }) => {
   const secret = new TextEncoder().encode(process.env.JWT_SECRET);
   const { SignJWT } = await import("jose");
