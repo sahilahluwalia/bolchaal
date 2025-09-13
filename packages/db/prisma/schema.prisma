@@ -186,7 +186,7 @@ model Message {
   content       String?
   messageType   MessageType @default(TEXT)
   attachmentId  String?
-  senderId      String      @default("bot")
+  senderId      String?      
   chatSessionId String?
   classroomId   String
   lessonId      String
