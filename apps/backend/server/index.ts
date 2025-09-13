@@ -1852,6 +1852,305 @@ export const appRouter = router({
 
     return { totalClassrooms, totalStudents, totalLessons, totalMessages };
   }),
+
+  getWeeklyMetrics: privateProcedure.query(async (opts) => {
+    if (opts.ctx.userRole !== "TEACHER") {
+      throw new TRPCError({ code: "FORBIDDEN" });
+    }
+
+    const teacherId = opts.ctx.userId;
+    const now = new Date();
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+    const [
+      weeklyMessages,
+      weeklyLessonsCreated,
+      weeklyEngagedStudents,
+    ] = await Promise.all([
+      // Count messages created in the last 7 days
+      prismaClient.message.count({
+        where: {
+          classroom: { teacherId },
+          createdAt: { gte: sevenDaysAgo },
+        },
+      }),
+      // Count lessons created in the last 7 days
+      prismaClient.lesson.count({
+        where: {
+          teacherId,
+          createdAt: { gte: sevenDaysAgo },
+        },
+      }),
+      // Count unique students who sent messages in the last 7 days
+      prismaClient.message.findMany({
+        where: {
+          classroom: { teacherId },
+          createdAt: { gte: sevenDaysAgo },
+          isBot: false, // Only count student messages, not bot messages
+        },
+        select: { senderId: true },
+        distinct: ['senderId'],
+      }).then(messages => messages.length),
+    ]);
+
+    return {
+      weeklyMessages,
+      weeklyLessonsCreated,
+      weeklyEngagedStudents,
+      weekStartDate: sevenDaysAgo,
+      weekEndDate: now,
+    };
+  }),
+
+  /**
+   * Get student profile data for teacher view
+   */
+  getStudentProfile: privateProcedure
+    .input(z.object({ studentId: z.string() }))
+    .query(async (opts) => {
+      if (opts.ctx.userRole !== "TEACHER") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const { studentId } = opts.input;
+
+      // Verify teacher has access to this student
+      const enrollment = await prismaClient.studentClassroom.findFirst({
+        where: {
+          studentId,
+          classroom: { teacherId: opts.ctx.userId },
+        },
+        select: { id: true },
+      });
+
+      if (!enrollment) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "No access to this student",
+        });
+      }
+
+      const student = await prismaClient.user.findUnique({
+        where: { id: studentId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          createdAt: true,
+          enrollments: {
+            where: { classroom: { teacherId: opts.ctx.userId } },
+            select: {
+              classroom: { select: { id: true, name: true } },
+              enrolledAt: true,
+            },
+          },
+        },
+      });
+
+      if (!student) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Student not found" });
+      }
+
+      return {
+        id: student.id,
+        name: student.name,
+        email: student.email,
+        createdAt: student.createdAt,
+        classrooms: student.enrollments.map((e) => ({
+          id: e.classroom.id,
+          name: e.classroom.name,
+          enrolledAt: e.enrolledAt,
+        })),
+      };
+    }),
+
+  /**
+   * Get student chat sessions grouped by lesson
+   */
+  getStudentChatSessions: privateProcedure
+    .input(z.object({ studentId: z.string() }))
+    .query(async (opts) => {
+      if (opts.ctx.userRole !== "TEACHER") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const { studentId } = opts.input;
+
+      // Verify teacher has access to this student
+      const enrollment = await prismaClient.studentClassroom.findFirst({
+        where: {
+          studentId,
+          classroom: { teacherId: opts.ctx.userId },
+        },
+        select: { id: true },
+      });
+
+      if (!enrollment) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "No access to this student",
+        });
+      }
+
+      const chatSessions = await prismaClient.chatSession.findMany({
+        where: { studentId },
+        include: {
+          classroom: { select: { id: true, name: true } },
+          messages: {
+            select: { id: true },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      // Get lesson data separately since lessonId might be null
+      const lessonIds = chatSessions
+        .map(session => session.lessonId)
+        .filter((id): id is string => id !== null);
+      
+      const lessons = lessonIds.length > 0 ? await prismaClient.lesson.findMany({
+        where: { id: { in: lessonIds } },
+        select: { id: true, title: true },
+      }) : [];
+
+      const lessonMap = new Map(lessons.map(lesson => [lesson.id, lesson]));
+
+      // Group by lesson and classroom
+      const groupedSessions = chatSessions.reduce((acc, session) => {
+        const key = `${session.classroomId}-${session.lessonId || 'no-lesson'}`;
+        if (!acc[key]) {
+          acc[key] = {
+            classroom: session.classroom,
+            lesson: session.lessonId ? lessonMap.get(session.lessonId) || null : null,
+            sessions: [],
+            totalMessages: 0,
+          };
+        }
+        acc[key].sessions.push(session);
+        acc[key].totalMessages += session.messages.length;
+        return acc;
+      }, {} as Record<string, any>);
+
+      return Object.values(groupedSessions).map((group: any) => ({
+        classroom: group.classroom,
+        lesson: group.lesson,
+        totalSessions: group.sessions.length,
+        totalMessages: group.totalMessages,
+        latestSession: group.sessions[0],
+        sessions: group.sessions,
+      }));
+    }),
+
+  /**
+   * Get messages for a specific chat session
+   */
+  getChatSessionMessages: privateProcedure
+    .input(z.object({ chatSessionId: z.string() }))
+    .query(async (opts) => {
+      if (opts.ctx.userRole !== "TEACHER") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const { chatSessionId } = opts.input;
+
+      // Verify teacher has access to this chat session
+      const chatSession = await prismaClient.chatSession.findFirst({
+        where: {
+          id: chatSessionId,
+          classroom: { teacherId: opts.ctx.userId },
+        },
+        select: { id: true },
+      });
+
+      if (!chatSession) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "No access to this chat session",
+        });
+      }
+
+      const messages = await prismaClient.message.findMany({
+        where: { chatSessionId },
+        include: {
+          sender: { select: { id: true, name: true, role: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      return messages;
+    }),
+
+  /**
+   * Get recent chat sessions for teacher across all students
+   */
+  getRecentChatSessions: privateProcedure
+    .input(z.object({ limit: z.number().min(1).max(50).default(10) }))
+    .query(async (opts) => {
+      if (opts.ctx.userRole !== "TEACHER") {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      const { limit } = opts.input;
+
+      const chatSessions = await prismaClient.chatSession.findMany({
+        where: {
+          classroom: { teacherId: opts.ctx.userId },
+        },
+        include: {
+          classroom: { 
+            select: { 
+              id: true, 
+              name: true 
+            } 
+          },
+          student: { 
+            select: { 
+              id: true, 
+              name: true, 
+              email: true 
+            } 
+          },
+          messages: {
+            select: { 
+              id: true,
+              createdAt: true 
+            },
+            orderBy: { createdAt: "desc" },
+            take: 1
+          },
+          _count: {
+            select: { messages: true }
+          }
+        },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+      });
+
+      // Get lesson data for sessions that have lessons
+      const lessonIds = chatSessions
+        .map(session => session.lessonId)
+        .filter((id): id is string => id !== null);
+      
+      const lessons = lessonIds.length > 0 ? await prismaClient.lesson.findMany({
+        where: { id: { in: lessonIds } },
+        select: { id: true, title: true },
+      }) : [];
+
+      const lessonMap = new Map(lessons.map(lesson => [lesson.id, lesson]));
+
+      return chatSessions.map(session => ({
+        id: session.id,
+        classroom: session.classroom,
+        student: session.student,
+        lesson: session.lessonId ? lessonMap.get(session.lessonId) || null : null,
+        status: session.status,
+        startedAt: session.startedAt,
+        endedAt: session.endedAt,
+        messageCount: session._count.messages,
+        lastMessageAt: session.messages[0]?.createdAt || null,
+      }));
+    }),
 });
 
 const server = createHTTPServer({

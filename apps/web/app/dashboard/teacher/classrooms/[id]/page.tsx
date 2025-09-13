@@ -450,17 +450,13 @@ export default function ClassroomDetailsPage() {
                     Started
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Duration
+                    Actions
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                 {classroom.ChatSession.slice(0, 10).map((session: any) => {
-                  const duration = session.endedAt
-                    ? Math.floor((new Date(session.endedAt).getTime() - new Date(session.startedAt).getTime()) / (1000 * 60))
-                    : null;
-
                   return (
                     <tr key={session.id}>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -492,8 +488,12 @@ export default function ClassroomDetailsPage() {
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(session.startedAt)}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                        {duration ? `${duration} min` : "Ongoing"}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <Link href={`/dashboard/teacher/students/${session.student.id}/chat-sessions/${session.id}`}>
+                          <Button variant="outline" size="sm">
+                            See Chat
+                          </Button>
+                        </Link>
                       </td>
                     </tr>
                   );
