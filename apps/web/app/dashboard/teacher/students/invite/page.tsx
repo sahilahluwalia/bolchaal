@@ -20,7 +20,7 @@ export default function InviteStudentPage() {
 	const [token, setToken] = useState<string | null>(null);
 	const [expiresAt, setExpiresAt] = useState<Date | null>(null);
 
-	const baseUrl = process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3000";
+	const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 	const inviteUrl = useMemo(() => {
 		if (!token) return "";
 		return `${baseUrl}/auth/student/sign-up/${token}`;

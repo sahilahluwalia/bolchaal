@@ -19,7 +19,8 @@
   "dependencies": {
     "@prisma/client": "^6.15.0",
     "@repo/common-utils": "workspace:*",
-    "@repo/typescript-config": "workspace:*"
+    "@repo/typescript-config": "workspace:*",
+    "zod": "^4.1.5"
   },
   "exports": {
     "./client": "./src/index.ts",

@@ -15,7 +15,6 @@
   "dependencies": {
     "@repo/common-utils": "workspace:*",
     "@repo/db": "workspace:*",
-    "@repo/queue": "workspace:*",
     "@repo/typescript-config": "workspace:^",
     "bullmq": "^5.58.5",
     "ioredis": "^5.7.0",
