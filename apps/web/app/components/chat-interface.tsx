@@ -48,6 +48,7 @@ export function ChatInterface({
   const [newMessage, setNewMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -56,18 +57,24 @@ export function ChatInterface({
   const saveRecordingRef = useRef<boolean>(false);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
   };
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
+  // Auto-scroll when typing indicator appears
+  useEffect(() => {
+    if (isTyping) {
+      scrollToBottom();
+    }
+  }, [isTyping]);
+
   // Fetch messages for this lesson
   const {
     data: fetchedMessages,
     isLoading,
-    isFetching,
   } = trpc.getLessonMessages.useQuery(
     { classroomId: classId, lessonId, chatSessionId },
     { enabled: !!classId && !!lessonId }
@@ -88,23 +95,32 @@ export function ChatInterface({
     );
     setMessages(mapped);
   }, [fetchedMessages]);
-
-  const utils = trpc.useUtils();
-  const sendMutation = trpc.sendLessonMessage.useMutation({
-    onSuccess: () => {
-      trpc.test.useSubscription(undefined, {
-        onData(n) {
-          console.log("number", n);
-        },
-      });
-      // We rely on the refetch to replace the optimistic message with the server version
-      utils.getLessonMessages.invalidate({
-        classroomId: classId,
-        lessonId,
-        chatSessionId,
-      });
+  trpc.chatWebSocket.useSubscription({
+    chatSessionId,
+  }, {
+    onData(n) {
+      // add ai feedback to messages
+      setMessages((prev) => [...prev, {
+        id: `tmp-${Date.now()}`,
+        content: n,
+        sender: "AI",
+        timestamp: new Date(),
+        isOwn: false,
+        type: "text",
+      }]);
+      // Hide typing indicator when data is received
+      setIsTyping(false);
+      console.log("ai feedback", n);
     },
   });
+  // const utils = trpc.useUtils();
+  const sendMutation = trpc.chat.useMutation({
+    onSuccess: () => {
+      // Show typing indicator when message is sent
+      setIsTyping(true);
+    },
+  });
+
 
   const handleSendMessage = () => {
     if (!newMessage.trim() || isDisabled) return;
@@ -119,12 +135,7 @@ export function ChatInterface({
     setMessages((prev) => [...prev, optimistic]);
     const toSend = newMessage;
     setNewMessage("");
-    sendMutation.mutate({
-      classroomId: classId,
-      lessonId,
-      content: toSend,
-      chatSessionId,
-    });
+    sendMutation.mutate({ classroomId: classId, lessonId, content: toSend, type: "TEXT", chatSessionId });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -328,8 +339,8 @@ export function ChatInterface({
             </div>
           ))}
 
-        {/* Typing / refetch indicator */}
-        {!isLoading && (isFetching || sendMutation.isPending) && (
+        {/* Typing indicator */}
+        {!isLoading && isTyping && (
           <div className="flex w-full justify-start">
             <div className="flex flex-col max-w-[280px] sm:max-w-xs md:max-w-sm lg:max-w-md xl:max-w-lg items-start">
               <div className="flex items-center gap-2 mb-1 px-1">
@@ -405,7 +416,7 @@ export function ChatInterface({
                   onKeyPress={handleKeyPress}
                   placeholder="Type a message..."
                   rows={1}
-                  className="w-full px-0 py-1 bg-transparent border-none outline-none resize-none text-sm placeholder:text-gray-500 leading-relaxed"
+                  className="w-full px-0 py-1 bg-transparent text-black border-none outline-none resize-none text-sm placeholder:text-gray-500 leading-relaxed"
                   style={{
                     minHeight: "24px",
                     maxHeight: "120px",
@@ -420,7 +431,8 @@ export function ChatInterface({
                 />
               </div>
               <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                <Button
+                {/* disabled for now */}
+                {/* <Button
                   onMouseDown={startRecording}
                   variant="ghost"
                   size="sm"
@@ -440,7 +452,7 @@ export function ChatInterface({
                       d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
                     />
                   </svg>
-                </Button>
+                </Button> */}
                 <Button
                   onClick={handleSendMessage}
                   disabled={!newMessage.trim()}
