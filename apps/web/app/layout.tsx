@@ -1,11 +1,9 @@
 import "@repo/ui/styles.css";
 import "./globals.css";
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
 import { Provider } from "./_trpc/Provider";
 import { Toaster } from "sonner";
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
-const geist = Geist({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "BolChaal - AI-Powered English Learning Platform",
@@ -110,7 +108,7 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <link rel="manifest" href="/site.webmanifest" />
       </head>
-      <body className={geist.className}>
+      <body>
         <Provider>
         <>{children}</>
         <ReactQueryDevtools initialIsOpen={false} />

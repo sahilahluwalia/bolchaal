@@ -8,7 +8,7 @@ import { trpc } from '../../_trpc/client';
 import { TRPCClientError } from '@trpc/client';
 import { Button } from '@repo/ui/button';
 import { AuthFooter } from '../../components/auth-footer';
-import { DemoAccountBox } from '@repo/ui/demo-account-box';
+import { DemoAccountBox } from '../../components/demo-account-box';
 import { TokenManager } from '../../../utils/auth';
 import { RedirectIfAuthenticated } from '../../components/require-auth';
 
@@ -98,7 +98,6 @@ export default function SignUpPage() {
         ...(formData.name.trim() && { name: formData.name.trim() }),
       });
 
-      // Store access token (refresh token is in HTTP cookie)
       TokenManager.setAccessToken(accessToken);
 
         router.push('/dashboard/teacher');

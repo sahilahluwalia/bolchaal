@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { InputField } from '@repo/ui/input-field';
 import { Button } from '@repo/ui/button';
 import { AuthFooter } from '../../components/auth-footer';
-import { DemoAccountBox } from '@repo/ui/demo-account-box';
+import { DemoAccountBox } from '../../components/demo-account-box';
 import { trpc } from '../../_trpc/client';
 import { TRPCClientError } from '@trpc/client';
 import { TokenManager } from '../../../utils/auth';
