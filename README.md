@@ -1,12 +1,31 @@
 # Bolchaal
 
-Educational platform with real-time chat, classroom management, and AI-powered features.
+A platform where teachers create classrooms and rubrics, and students engage in chat or audio conversations with bots to practice, improve, and get feedback on English.
+
+## Images
+Application Homepage
+
+![Application Homepage](docs/homepage.png)
+
+Teacher Dashboard
+
+![Teacher Dashboard](docs/teacher-dashboard.png)
+
+
+Classroom Management
+
+![Classroom Management](docs/classroom-management.png)
+
+Student Chatroom with Bot
+
+![Student Chatroom](docs/student-chat.png)
+
 
 ## Tech Stack
 
 - **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
 - **Backend**: Node.js, tRPC, TypeScript
-- **Database**: PostgreSQL with Prisma ORM
+- **Database**: PostgreSQL with Prisma ORM, with WebSockets
 - **Queue**: BullMQ with Redis
 - **Auth**: JWT with Jose
 - **Build**: Turbo (monorepo), pnpm
@@ -46,7 +65,7 @@ pnpm run dev
 Services run on:
 - Web: http://localhost:3000
 - Backend: http://localhost:3005
-- BullMQ: http://localhost:3006
+- BullMQ: ws://localhost:3006
 
 ## Deployment
 

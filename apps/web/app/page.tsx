@@ -245,6 +245,8 @@ export default function Page() {
             </div>
           </div>
         </div>
+        <p>Build:{" "}
+        {new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}</p>
       </footer>
     </main>
     </>
