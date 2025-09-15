@@ -13,6 +13,13 @@ const createClient = () => {
       return {
         'Authorization': `Bearer ${token}`
       };
+    },
+    retryDelayMs: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    onOpen: () => {
+      console.log('tRPC WS connected');
+    },
+    onClose: () => {
+      console.log('tRPC WS disconnected, retrying...');
     }
   })
 

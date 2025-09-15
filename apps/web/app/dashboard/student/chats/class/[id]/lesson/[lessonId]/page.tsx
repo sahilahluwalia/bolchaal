@@ -90,6 +90,17 @@ export default function StudentClassLessonChatPage({
               ))
             )}
           </div>
+          {/* Feedback command note at bottom */}
+          <div className="p-4 border-t border-gray-200">
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs text-blue-800 font-medium mb-1">
+                💡 Pro tip:
+              </p>
+              <p className="text-xs text-blue-700">
+                Use <span className="font-mono font-semibold">!feedback</span> to get feedback on your work, or chat normally with the AI bot!
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Chat Interface */}

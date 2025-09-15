@@ -2,7 +2,7 @@ class TokenManager {
   private static readonly ACCESS_TOKEN_KEY = 'access-token';
 
   /**
-   * Store access token only (refresh token is in HTTP cookie)
+   * Store access token
    */
   static setAccessToken(accessToken: string): void {
     if (typeof window === 'undefined') return;
@@ -26,7 +26,7 @@ class TokenManager {
   }
 
   /**
-   * Update only the access token (after refresh)
+   * Update the access token
    */
   static updateAccessToken(accessToken: string): void {
     if (typeof window === 'undefined') return;

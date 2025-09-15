@@ -235,12 +235,6 @@ export default function LessonDetailsPage() {
               >
                 Assign to Classroom
               </Link>
-              <Link
-                href={`/dashboard/teacher/lessons/${lessonId}/duplicate`}
-                className="block w-full px-4 py-2 bg-gray-50 text-gray-700 rounded-md hover:bg-gray-100 transition-colors text-center font-medium"
-              >
-                Duplicate Lesson
-              </Link>
             </div>
           </div>
         </div>

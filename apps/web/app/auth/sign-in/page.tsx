@@ -73,7 +73,7 @@ export default function SignInPage() {
         password: formData.password,
       });
 
-      // Store access token (refresh token is in HTTP cookie)
+      // Store access token
       TokenManager.setAccessToken(accessToken);
 
       if(role === 'TEACHER'){
@@ -107,12 +107,17 @@ export default function SignInPage() {
         </Link>
       </div>
 
-      <div className="flex items-center justify-center min-h-[80vh] gap-8 lg:gap-12">
+      <div className="flex flex-col lg:flex-row items-center justify-center min-h-[80vh] gap-6 lg:gap-12">
+        {/* Demo Account Box - Top on mobile, Side on desktop */}
+        <div className="w-full max-w-sm order-first lg:order-last">
+          <DemoAccountBox />
+        </div>
+
         {/* Auth Form - Centered */}
-        <div className="flex-1 max-w-md">
-          <div className="bg-white rounded-xl shadow-lg p-8">
+        <div className="flex-1 max-w-md order-last lg:order-first">
+          <div className="bg-white rounded-xl shadow-lg p-6 sm:p-8">
             <div className="text-center">
-              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
                 Welcome back
               </h2>
               <p className="text-gray-600">
@@ -120,7 +125,7 @@ export default function SignInPage() {
               </p>
             </div>
 
-            <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+            <form className="mt-6 sm:mt-8 space-y-6" onSubmit={handleSubmit}>
               {errors.general && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
                   {errors.general}
@@ -184,11 +189,6 @@ export default function SignInPage() {
             {/* Footer with back button and branding */}
             <AuthFooter />
           </div>
-        </div>
-
-        {/* Demo Account Box - Side */}
-        <div className="flex-shrink-0 w-full max-w-sm order-first lg:order-last">
-          <DemoAccountBox />
         </div>
       </div>
     </div>

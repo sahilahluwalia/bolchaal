@@ -1,5 +1,5 @@
 {
-  "name": "web",
+  "name": "@repo/web",
   "version": "1.0.0",
   "type": "module",
   "private": true,
@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@repo/backend": "workspace:*",
-    "@repo/db": "workspace:*",
     "@repo/ui": "workspace:*",
     "@tanstack/react-query": "^5.87.1",
     "@tanstack/react-query-devtools": "^5.87.3",

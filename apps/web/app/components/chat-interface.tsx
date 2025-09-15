@@ -26,14 +26,17 @@ interface ChatInterfaceProps {
 
 // Types matching server response for getLessonMessages
 interface ServerMessage {
-  id: string;
-  content: string | null;
-  isBot: boolean;
-  senderId: string | null;
-  senderName: string | null;
-  createdAt: string | Date;
-  messageType: "TEXT" | "AUDIO";
-  attachmentUrl: string | null;
+  chatSessionId: string;
+  messages: {
+    id: string;
+    content: string | null;
+    isBot: boolean;
+    senderId: string | null;
+    senderName: string | null;
+    createdAt: string | Date;
+    messageType: "TEXT" | "AUDIO";
+    attachmentUrl: string | null;
+  }[];
 }
 
 export function ChatInterface({
@@ -55,7 +58,8 @@ export function ChatInterface({
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const saveRecordingRef = useRef<boolean>(false);
-
+  const [chatSessionForFetchingMessages, setChatSessionForFetchingMessages] =
+    useState(chatSessionId);
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
   };
@@ -75,44 +79,60 @@ export function ChatInterface({
   const {
     data: fetchedMessages,
     isLoading,
+    isSuccess,
   } = trpc.getLessonMessages.useQuery(
     { classroomId: classId, lessonId, chatSessionId },
     { enabled: !!classId && !!lessonId }
   );
+  useEffect(() => {
+    if (isSuccess && fetchedMessages?.chatSessionId) {
+      setChatSessionForFetchingMessages(fetchedMessages?.chatSessionId);
+    }
+  }, [isSuccess, fetchedMessages?.chatSessionId]);
 
   useEffect(() => {
     if (!fetchedMessages) return;
-    const mapped: Message[] = (fetchedMessages as ServerMessage[]).map(
-      (m: ServerMessage) => ({
-        id: m.id,
-        content: m.content || "",
-        sender: m.senderName || (m.isBot ? "AI" : "User"),
-        timestamp: new Date(m.createdAt),
-        isOwn: !m.isBot && !!m.senderId, // treat user-sent as own
-        type: m.messageType === "AUDIO" ? "audio" : "text",
-        audioUrl: m.attachmentUrl ?? undefined,
-      })
-    );
+    const mapped: Message[] = (
+      fetchedMessages as ServerMessage
+    ).messages.map((m: ServerMessage["messages"][0]) => ({
+      id: m.id,
+      content: m.content || "",
+      sender: m.senderName || (m.isBot ? "AI" : "User"),
+      timestamp: new Date(m.createdAt),
+      isOwn: !m.isBot && !!m.senderId, // treat user-sent as own
+      type: m.messageType === "AUDIO" ? "audio" : "text",
+      audioUrl: m.attachmentUrl ?? undefined,
+    }));
     setMessages(mapped);
   }, [fetchedMessages]);
-  trpc.chatWebSocket.useSubscription({
-    chatSessionId,
-  }, {
-    onData(n) {
-      // add ai feedback to messages
-      setMessages((prev) => [...prev, {
-        id: `tmp-${Date.now()}`,
-        content: n,
-        sender: "AI",
-        timestamp: new Date(),
-        isOwn: false,
-        type: "text",
-      }]);
-      // Hide typing indicator when data is received
-      setIsTyping(false);
-      console.log("ai feedback", n);
+  trpc.chatWebSocket.useSubscription(
+    {
+      chatSessionId:chatSessionForFetchingMessages,
     },
-  });
+    {
+      enabled: !!chatSessionForFetchingMessages,
+      onData(n) {
+        // add ai feedback to messages
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `tmp-${Date.now()}`,
+            content: n,
+            sender: "AI",
+            timestamp: new Date(),
+            isOwn: false,
+            type: "text",
+          },
+        ]);
+        // Hide typing indicator when data is received
+        setIsTyping(false);
+        console.log("ai feedback", n);
+      },
+      onError(err) {
+        console.error("WS subscription error:", err);
+      },
+    }
+  );
   // const utils = trpc.useUtils();
   const sendMutation = trpc.chat.useMutation({
     onSuccess: () => {
@@ -120,7 +140,6 @@ export function ChatInterface({
       setIsTyping(true);
     },
   });
-
 
   const handleSendMessage = () => {
     if (!newMessage.trim() || isDisabled) return;
@@ -135,7 +154,13 @@ export function ChatInterface({
     setMessages((prev) => [...prev, optimistic]);
     const toSend = newMessage;
     setNewMessage("");
-    sendMutation.mutate({ classroomId: classId, lessonId, content: toSend, type: "TEXT", chatSessionId });
+    sendMutation.mutate({
+      classroomId: classId,
+      lessonId,
+      content: toSend,
+      type: "TEXT",
+      chatSessionId:chatSessionForFetchingMessages,
+    });
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
