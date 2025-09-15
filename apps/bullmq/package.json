@@ -1,0 +1,29 @@
+{
+  "name": "@repo/bullmq",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.ts",
+  "scripts": {
+    "build": "tsc -b",
+    "start": "node ./dist/index.js",
+    "start:bullmq": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@repo/common-utils": "workspace:*",
+    "@repo/db": "workspace:*",
+    "@repo/typescript-config": "workspace:^",
+    "bullmq": "^5.58.5",
+    "exponential-backoff": "^3.1.2",
+    "ioredis": "^5.7.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.5"
+  },
+  "exports": {
+    "./index": "./src/index.ts"
+  }
+}
