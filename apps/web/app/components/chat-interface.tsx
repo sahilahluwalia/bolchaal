@@ -81,7 +81,7 @@ export function ChatInterface({
     isLoading,
     isSuccess,
   } = trpc.getLessonMessages.useQuery(
-    { classroomId: classId, lessonId, chatSessionId },
+    { classroomId: classId, lessonId, chatSessionId: chatSessionForFetchingMessages },
     { enabled: !!classId && !!lessonId }
   );
   useEffect(() => {
@@ -89,6 +89,11 @@ export function ChatInterface({
       setChatSessionForFetchingMessages(fetchedMessages?.chatSessionId);
     }
   }, [isSuccess, fetchedMessages?.chatSessionId]);
+
+  // Update local session when prop changes
+  useEffect(() => {
+    setChatSessionForFetchingMessages(chatSessionId);
+  }, [chatSessionId]);
 
   useEffect(() => {
     if (!fetchedMessages) return;
@@ -107,7 +112,7 @@ export function ChatInterface({
   }, [fetchedMessages]);
   trpc.chatWebSocket.useSubscription(
     {
-      chatSessionId:chatSessionForFetchingMessages,
+      chatSessionId: chatSessionForFetchingMessages,
     },
     {
       enabled: !!chatSessionForFetchingMessages,
@@ -135,9 +140,18 @@ export function ChatInterface({
   );
   // const utils = trpc.useUtils();
   const sendMutation = trpc.chat.useMutation({
-    onSuccess: () => {
-      // Show typing indicator when message is sent
+    onSuccess: async () => {
       setIsTyping(true);
+      // Refresh messages to capture newly created chatSessionId ASAP
+      // try {
+      //   await utils.getLessonMessages.invalidate({
+      //     classroomId: classId,
+      //     lessonId,
+      //     chatSessionId: chatSessionForFetchingMessages,
+      //   });
+      // } catch (e) {
+      //   console.error("Failed to refresh messages after send:", e);
+      // }
     },
   });
 
