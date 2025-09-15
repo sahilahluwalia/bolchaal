@@ -19,7 +19,6 @@
     "@repo/db": "workspace:*",
     "@trpc/client": "^11.5.1",
     "@trpc/server": "^11.5.1",
-    "bun": "^1.2.21",
     "cors": "^2.8.5",
     "dotenv": "^17.2.2",
     "jose": "^6.1.0",
