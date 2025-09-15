@@ -1,0 +1,41 @@
+FROM node:lts-alpine AS builder
+
+ARG DB_URL
+# // for tailwind build
+# ENV NODE_ENV=development
+ENV NEXT_PUBLIC_BASE_URL=http://localhost:3000
+ENV NEXT_PUBLIC_API_URL=http://localhost:3005
+ENV NEXT_PUBLIC_WS_URL=ws://localhost:3005
+
+RUN corepack enable pnpm
+WORKDIR /user/src/app
+
+COPY ./package.json ./pnpm-lock.yaml ./pnpm-workspace.yaml ./
+COPY ./turbo.json ./
+COPY ./packages/ ./packages/
+COPY ./apps/web ./apps/web
+# COPY . .
+
+RUN pnpm install --frozen-lockfile
+# RUN pnpm turbo build --filter=web
+
+# WORKDIR /apps/web
+# RUN pnpm run -r build
+RUN pnpm run build --filter=@repo/web
+
+# COPY apps/web/package.json ./package.json
+
+# COPY package.json package.json
+# RUN pnpm install
+
+# WORKDIR /
+
+# WORKDIR /
+
+# // console.log currrent dir
+# RUN pnpm run build
+# RUN pnpm run build --filter=web
+
+EXPOSE 3000
+
+CMD ["pnpm","run","start:web"]

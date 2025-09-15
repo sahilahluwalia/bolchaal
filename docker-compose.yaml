@@ -1,0 +1,76 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    ports:
+      - 3000:3000
+    env_file:
+      - ./apps/web/.env
+    depends_on:
+      - backend
+      - bullmq
+    networks:
+      - app-network
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - 3005:3005
+    env_file:
+      - ./apps/backend/.env
+    environment:
+      - REDIS_URL=redis://:redis123@redis:6379
+    networks:
+      - app-network
+    depends_on:
+      - postgres
+      - redis
+  bullmq:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bullmq
+    ports:
+      - 3006:3006
+    env_file:
+      - ./apps/bullmq/.env
+    environment:
+      - REDIS_URL=redis://:redis123@redis:6379
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - app-network
+
+  postgres:
+    image: postgres
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=localdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    environment:
+      - REDIS_PASSWORD=redis123
+    command: redis-server --requirepass redis123
+    networks:
+      - app-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  app-network:
+    driver: bridge 
