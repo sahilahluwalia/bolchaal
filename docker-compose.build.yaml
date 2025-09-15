@@ -1,6 +1,8 @@
 services:
   web:
-    image: ggoneman/bolchaal-web
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
     ports:
       - 3000:3000
     env_file:
@@ -15,7 +17,9 @@ services:
     networks:
       - app-network
   backend:
-    image: ggoneman/bolchaal-backend
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
     ports:
       - 3005:3005
       - 3006:3006
@@ -30,7 +34,9 @@ services:
       - postgres
       - redis
   bullmq:
-    image: ggoneman/bolchaal-bullmq
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.bullmq
     env_file:
       - ./apps/bullmq/.env
     environment:

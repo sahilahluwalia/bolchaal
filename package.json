@@ -9,8 +9,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "start:web": "cd apps/web && pnpm run start",
     "db:generate": "cd packages/db && npx prisma generate --schema=./prisma/schema.prisma && cd ../..",
-    "db:seed": "cd packages/db && pnpm run db:seed",
-    "db:migrate": "cd packages/db && pnpm run db:migrate",
+    "db:first-time-setup": "cd packages/db && pnpm run db:deploy && pnpm run db:generate && pnpm run db:seed",
     "start:backend": "cd apps/backend && pnpm run start:backend",
     "start:bullmq": " cd apps/bullmq && pnpm run start:bullmq"
   },

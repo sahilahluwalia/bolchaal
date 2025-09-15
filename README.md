@@ -1,58 +1,72 @@
-# Turborepo Tailwind CSS starter
+# Bolchaal
 
-This Turborepo starter is maintained by the Turborepo core team.
+Educational platform with real-time chat, classroom management, and AI-powered features.
 
-## Using this example
+## Tech Stack
 
-Run the following command:
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS
+- **Backend**: Node.js, tRPC, TypeScript
+- **Database**: PostgreSQL with Prisma ORM
+- **Queue**: BullMQ with Redis
+- **Auth**: JWT with Jose
+- **Build**: Turbo (monorepo), pnpm
+- **Deployment**: Docker, Docker Compose
 
-```sh
-npx create-turbo@latest -e with-tailwind
+## Setup
+
+### Prerequisites
+- Node.js >= 18
+- pnpm 8.15.6
+- Docker & Docker Compose
+
+#### For PNPM
+```
+npm install --global corepack@latest
+```
+### Development
+```bash
+# Install dependencies
+pnpm install
+
+# Start Database
+docker compose up -d postgres redis
+
+# Setup Env Variables
+find . -name ".env.example" -exec sh -c 'cp "$1" "${1%.example}"' _ {} \;
+
+Use Vercel AI Interface to Generate Token for enabling ai features
+
+# Setup database
+pnpm run db:first-time-setup
+
+# Start development servers
+pnpm run dev
 ```
 
-## What's inside?
+Services run on:
+- Web: http://localhost:3000
+- Backend: http://localhost:3005
+- BullMQ: http://localhost:3006
 
-This Turborepo includes the following packages/apps:
+## Deployment
 
-### Apps and Packages
+### Docker Compose
+```bash
+# Build all services
+docker-compose -f docker-compose.build.yaml build
 
-- `docs`: a [Next.js](https://nextjs.org/) app with [Tailwind CSS](https://tailwindcss.com/)
-- `web`: another [Next.js](https://nextjs.org/) app with [Tailwind CSS](https://tailwindcss.com/)
-- `ui`: a stub React component library with [Tailwind CSS](https://tailwindcss.com/) shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Building packages/ui
-
-This example is set up to produce compiled styles for `ui` components into the `dist` directory. The component `.tsx` files are consumed by the Next.js apps directly using `transpilePackages` in `next.config.ts`. This was chosen for several reasons:
-
-- Make sharing one `tailwind.config.ts` to apps and packages as easy as possible.
-- Make package compilation simple by only depending on the Next.js Compiler and `tailwindcss`.
-- Ensure Tailwind classes do not overwrite each other. The `ui` package uses a `ui-` prefix for it's classes.
-- Maintain clear package export boundaries.
-
-Another option is to consume `packages/ui` directly from source without building. If using this option, you will need to update the `tailwind.config.ts` in your apps to be aware of your package locations, so it can find all usages of the `tailwindcss` class names for CSS compilation.
-
-For example, in [tailwind.config.ts](packages/tailwind-config/tailwind.config.ts):
-
-```js
-  content: [
-    // app content
-    `src/**/*.{js,ts,jsx,tsx}`,
-    // include packages if not transpiling
-    "../../packages/ui/*.{js,ts,jsx,tsx}",
-  ],
+# Run in background
+docker-compose up
 ```
 
-If you choose this strategy, you can remove the `tailwindcss` and `autoprefixer` dependencies from the `ui` package.
+### Environment Variables
+# Setup Env Variables
+```
+find . -name ".env.example" -exec sh -c 'cp "$1" "${1%.example}"' _ {} \;
+```
 
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [Tailwind CSS](https://tailwindcss.com/) for styles
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+Required variables:
+- `DATABASE_URL`
+- `REDIS_URL`
+- `JWT_SECRET`
+- `AI_GATEWAY_API_KEY`
