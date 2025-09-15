@@ -2,7 +2,13 @@
 
 A platform where teachers create classrooms and rubrics, and students engage in chat or audio conversations with bots to practice, improve, and get feedback on English.
 
-## Images
+
+## Main Scalable AI generation Text/Audio Pipeline
+![Main Scalable AI generation Text/Audio Pipeline](docs/scalable-backend.png)
+
+
+## Application Images
+
 Application Homepage
 
 ![Application Homepage](docs/homepage.png)
