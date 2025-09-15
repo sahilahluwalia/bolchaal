@@ -32,6 +32,6 @@ jobs:
             ggoneman/bolchaal-web:latest
           push: true
           build-args: |
-            - NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
-            - NEXT_PUBLIC_WS_URL=${{ vars.NEXT_PUBLIC_WS_URL }}
-            - NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL }}
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+            NEXT_PUBLIC_WS_URL=${{ vars.NEXT_PUBLIC_WS_URL }}
+            NEXT_PUBLIC_BASE_URL=${{ vars.NEXT_PUBLIC_BASE_URL }}

@@ -1,29 +1,29 @@
-
 jinso-clone.sahilahluwalia.com {
 	encode
 
-    // # WebSocket connections under /ws go to backend:3006
+    # Redirect root domain to www
+    redir https://www.jinso-clone.sahilahluwalia.com{uri}
+
+    # WebSocket connections under /ws go to backend:3006
     @websocket {
         path /ws*
         header Connection *Upgrade*
         header Upgrade websocket
     }
     handle @websocket {
-        reverse_proxy backend:3006
+        reverse_proxy :3006
     }
 
-    // # API requests go to backend:3005
-	handle /api/* {
-		reverse_proxy backend:3005
-	}
+    # API requests go to backend:3005
+    handle /api/* {
+        reverse_proxy :3005
+    }
 
-    // # All other requests go to Next.js web:3000
-	reverse_proxy web:3000
-}
-
-jinso-clone.sahilahluwalia.com {
-	redir https://www.{host}{uri}
+    # All other requests go to Next.js web:3000
+    reverse_proxy :3000
 }
 
 www.jinso-clone.sahilahluwalia.com {
+    reverse_proxy :3000
 }
+
