@@ -40,3 +40,5 @@ yarn-error.log*
 dist/
 packages/db/generated/prisma
 packages/db/prisma/generated
+
+!.github/

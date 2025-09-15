@@ -1,7 +1,7 @@
 #  build docker image
 # push to docker hub
 
-name: Build Backend Docker Image
+name: Build Nextjs Web Docker Image
 
 on:
   push:
@@ -24,11 +24,8 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
-          file: ./docker/Dockerfile.backend
+          file: ./docker/Dockerfile.web
           tags: |
-            ggoneman/bolchaal-backend:${{ github.sha }}
-            ggoneman/bolchaal-backend:latest
+            ggoneman/bolchaal-web:${{ github.sha }}
+            ggoneman/bolchaal-web:latest
           push: true
-          #  push the built image to latest also
-  
-          
