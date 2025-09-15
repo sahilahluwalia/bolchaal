@@ -350,6 +350,11 @@ const generateAIFeedbackWorker = new Worker(
     console.log("messageCollections", messageCollections);
     let result;
     try {
+      // if message collections is empty and feedback is true, then return "No messages to generate feedback"
+      if (messageCollections?.length === 0 && handleStudentMessages(content) === KindsOfStudentMessages.feedback) {
+        console.log("No messages to generate feedback");
+        result = { object: { content: "No messages to generate feedback" } };
+      }else {
       result = await backOff(() =>
         generateObject({
           model: "gpt-4.1-nano",
@@ -360,6 +365,7 @@ const generateAIFeedbackWorker = new Worker(
           messages: messageCollections || [],
         })
       );
+      }
       // console.log("text generation result", result);
     } catch (error) {
       console.log("error in text generation:", error);
