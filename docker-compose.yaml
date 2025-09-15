@@ -86,6 +86,7 @@ services:
     image: containrrr/watchtower
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./docker/config.json:/config.json:ro
     command:
       - "--label-enable"
       - "--interval"
@@ -94,7 +95,7 @@ services:
       - "--cleanup"
       - "--log-level"
       - "fatal"
-    restart: always
+    restart: unless-stopped
     networks:
       - app-network
 
