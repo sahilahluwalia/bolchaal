@@ -126,21 +126,18 @@ export const appRouter = router({
       }
       
       return observable<string>((subscriber) => {
-        // Create a message handler function
         const messageHandler = (channel: string, message: string) => {
-          console.log("Backend: received message from backend in chatWebSocket", channel, message);
-          const data = JSON.parse(message);
-          console.log("Backend: received message from backend in chatWebSocket", data);
-          console.log("data.chatSessionId === chatSessionId", data.chatSessionId === chatSessionId);
-          if (data.chatSessionId === chatSessionId) {
-            subscriber.next(data.aiFeedback);
+          if (channel !== pubChannelName) return;
+          try {
+            const data = JSON.parse(message);
+            if (data?.chatSessionId === chatSessionId && typeof data.aiFeedback === 'string') {
+              subscriber.next(data.aiFeedback);
+            }
+          } catch (e) {
+            console.error('Failed to parse Redis message:', e);
           }
         };
-
-        // Add the listener
         pubSub.on("message", messageHandler);
-
-        // Return cleanup function
         return () => {
           console.log("Cleaning up chatWebSocket subscription for chatSessionId:", chatSessionId);
           pubSub.off("message", messageHandler);
@@ -149,19 +146,13 @@ export const appRouter = router({
     }),
   test: privateProcedure.subscription((_opts) => {
     return observable<number>((subscriber) => {
-      pubSub.subscribe(REDIS_CHANNELS.textMessageChannel, (err) => {
-        if (err) console.error("Failed to subscribe:", err.message);
-      });
-
       const id = setInterval(() => {
         try {
           subscriber.next(Math.random());
         } catch {}
       }, 1000);
-
       return () => {
         clearInterval(id);
-        pubSub.unsubscribe(REDIS_CHANNELS.textMessageChannel).catch(() => {});
       };
     });
   }),
@@ -1261,7 +1252,7 @@ export const appRouter = router({
       z.object({
         classroomId: z.string(),
         lessonId: z.string(),
-        chatSessionId: z.string(),
+        chatSessionId: z.string().optional(),
       })
     )
     .query(async (opts) => {
@@ -1270,7 +1261,7 @@ export const appRouter = router({
       }
 
       const { classroomId, lessonId, chatSessionId } = opts.input;
-
+      let  returnChatSessionId;
       // Ensure the student is enrolled and get the chat session
       const enrollment = await prismaClient.studentClassroom.findFirst({
         where: { studentId: opts.ctx.userId, classroomId },
@@ -1282,13 +1273,15 @@ export const appRouter = router({
           message: "Not enrolled in classroom",
         });
       }
+      if (!chatSessionId) {
       // check if chat session exists
       const chatSession = await prismaClient.chatSession.findFirst({
         where: { studentId: opts.ctx.userId, classroomId, lessonId },
       });
       if (!chatSession) {
+        console.log("chatSession not found, creating new chat session");
         // create chat session for faster response in message reply
-        await prismaClient.chatSession.create({
+        returnChatSessionId=await prismaClient.chatSession.create({
           data: {
             studentId: opts.ctx.userId,
             classroomId,
@@ -1296,12 +1289,13 @@ export const appRouter = router({
           },
         });
       }
-      if (!chatSession) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Chat session not found",
-        });
-      }
+    }
+      // if (!chatSession) {
+      //   throw new TRPCError({
+      //     code: "NOT_FOUND",
+      //     message: "Chat session not found",
+      //   });
+      // }
       const messages = await prismaClient.message.findMany({
         where: { chatSessionId, lessonId },
         include: {
@@ -1311,7 +1305,21 @@ export const appRouter = router({
         orderBy: { createdAt: "asc" },
       });
 
-      return messages.map((m) => ({
+      return {
+        chatSessionId: chatSessionId || returnChatSessionId?.id,
+        messages: messages.map((m) => ({
+          id: m.id,
+          content: m.content,
+          isBot: m.isBot,
+          senderId: m.senderId,
+          senderName: m.sender?.name ?? (m.isBot ? "AI" : "User"),
+          createdAt: m.createdAt,
+          messageType: m.messageType,
+          attachmentUrl: m.attachment?.url ?? null,
+        })),
+      };
+      
+      messages.map((m) => ({
         id: m.id,
         content: m.content,
         isBot: m.isBot,
@@ -2192,7 +2200,7 @@ const handler = applyWSSHandler({
   keepAlive: {
     enabled: true,
     pingMs: 30000,
-    pongWaitMs: 5000,
+    pongWaitMs: 20000,
   },
 });
 

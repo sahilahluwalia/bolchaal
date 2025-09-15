@@ -33,7 +33,7 @@ export const generateToken = async ({
   id: string;
   role: UserRole;
 }) => {
-  const secret = new TextEncoder().encode(process.env.JWT_SECRET);
+  const secret = new TextEncoder().encode(process.env.JWT_SECRET || "secretsuperlongsecretintheworldofhumansonplanetearthinmilkywaygalaxy");
   const { SignJWT } = await import("jose");
   const token = await new SignJWT({ user: { id, role } })
     .setProtectedHeader({ alg: "HS256" })
