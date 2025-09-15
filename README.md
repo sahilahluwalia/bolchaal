@@ -20,8 +20,9 @@ Educational platform with real-time chat, classroom management, and AI-powered f
 - Docker & Docker Compose
 
 #### For PNPM
+```
 npm install --global corepack@latest
-
+```
 ### Development
 ```bash
 # Install dependencies
@@ -36,8 +37,7 @@ find . -name ".env.example" -exec sh -c 'cp "$1" "${1%.example}"' _ {} \;
 Use Vercel AI Interface to Generate Token for enabling ai features
 
 # Setup database
-pnpm run db:migrate
-pnpm run db:seed
+pnpm run db:first-time-setup
 
 # Start development servers
 pnpm run dev
