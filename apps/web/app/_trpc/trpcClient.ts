@@ -30,7 +30,7 @@ const createClient = () => {
         condition: (op) => op.type === 'subscription',
         true: wsLink({client: wsClient}),
         false: httpLink({
-          url: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005',
+          url: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3006',
           headers: () => {
             const token = TokenManager.getAccessToken();
             if (!token) return {};

@@ -40,7 +40,7 @@ pubSub.subscribe(pubChannelName, (err) => {
   console.log("subscribed to", pubChannelName);
   if (err) console.error("Failed to subscribe:", err.message);
 });
-
+// console.log(prismaClient)
 // send to frontend with websocket
 pubSub.on("message", (channel, message) => {
   // {"aiFeedback":"Great to hear that!","chatSessionId":"a5e5915e-f6fb-4bef-9f59-f6f177b88732","userId":"bd1fc974-c133-4774-8923-0915ac22d2ea"}
@@ -105,6 +105,7 @@ export const appRouter = router({
         accessToken,
         role: user.role,
       };
+   
     }),
   chatWebSocket: privateProcedure
     .input(
@@ -235,6 +236,7 @@ export const appRouter = router({
         input: { email, password },
         ctx,
       } = opts;
+    try{
       const user = await prismaClient.user.findFirst({
         select: {
           id: true,
@@ -259,6 +261,10 @@ export const appRouter = router({
         accessToken,
         role: user.role,
       };
+    } catch (e) {
+      console.error("Failed to sign in:", e);
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to sign in" });
+    }
     }),
   logout: publicProcedure.mutation(async () => {
     // Stateless logout when only using access tokens

@@ -30,6 +30,8 @@ export const REDIS_CHANNELS = {
   audioMessageChannel: "audio-message-channel",
   textMessageChannel: "text-message-channel",
 };
+
+console.log('bullmq started')
 // pubSub.subscribe(
 //   REDIS_CHANNELS.audioMessageChannel,
 //   REDIS_CHANNELS.textMessageChannel,
@@ -358,7 +360,7 @@ const generateAIFeedbackWorker = new Worker(
           messages: messageCollections || [],
         })
       );
-      console.log("text generation result", result);
+      // console.log("text generation result", result);
     } catch (error) {
       console.log("error in text generation:", error);
       return "error in text generation:" + error;
