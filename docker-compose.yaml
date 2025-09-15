@@ -6,9 +6,9 @@ services:
     env_file:
       - ./apps/web/.env
     environment:
-      - NEXT_PUBLIC_BASE_URL=http://localhost:3000
-      - NEXT_PUBLIC_API_URL=http://localhost:3005
-      - NEXT_PUBLIC_WS_URL=ws://localhost:3006
+      - NEXT_PUBLIC_BASE_URL=https://jinso-clone.sahilahluwalia.com
+      - NEXT_PUBLIC_API_URL=https://jinso-clone.sahilahluwalia.com/api
+      - NEXT_PUBLIC_WS_URL=wss://jinso-clone.sahilahluwalia.com/ws
     depends_on:
       - backend
       - bullmq
@@ -65,10 +65,21 @@ services:
     command: redis-server --requirepass redis123
     networks:
       - app-network
+  caddy:
+    image: caddy
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - caddy_data:/data
+      - ./caddy_config/Caddyfile:/etc/caddy/Caddyfile:ro,Z
+    networks:
+      - app-network
 
 volumes:
   postgres_data:
   redis_data:
+  caddy_data:
 
 networks:
   app-network:
