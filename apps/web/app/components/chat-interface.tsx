@@ -82,7 +82,7 @@ export function ChatInterface({
     isSuccess,
   } = trpc.getLessonMessages.useQuery(
     { classroomId: classId, lessonId, chatSessionId: chatSessionForFetchingMessages },
-    { enabled: !!classId && !!lessonId }
+    { enabled: !!classId && !!lessonId, refetchInterval: 2000 }
   );
   useEffect(() => {
     if (isSuccess && fetchedMessages?.chatSessionId) {
