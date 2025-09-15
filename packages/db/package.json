@@ -4,10 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "db:generate": "prisma generate ",
+    "db:generate": "prisma generate --schema=./prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --skip-generate",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "tsx src/seed.js"
+    "db:seed": "tsx src/seed.js",
+    "db:first-time-setup": "npx -y prisma db push && pnpm run db:seed"
   },
   "keywords": [],
   "author": "",

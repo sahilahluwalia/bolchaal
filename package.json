@@ -6,10 +6,15 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "check-types": "turbo run check-types",
-    "format": "prettier --write \"**/*.{ts,tsx,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "start:web": "cd apps/web && pnpm run start",
+    "db:generate": "cd packages/db && npx prisma generate --schema=./prisma/schema.prisma && cd ../..",
+    "db:seed": "cd packages/db && pnpm run db:seed",
+    "db:migrate": "cd packages/db && pnpm run db:migrate",
+    "start:backend": "cd apps/backend && pnpm run start:backend",
+    "start:bullmq": " cd apps/bullmq && pnpm run start:bullmq"
   },
   "devDependencies": {
-    "@types/ioredis": "^5.0.0",
     "prettier": "^3.6.0",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "turbo": "^2.5.6"
@@ -21,8 +26,5 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ],
-  "dependencies": {
-    "ioredis": "^5.7.0"
-  }
+  ]
 }
