@@ -1,5 +1,4 @@
-const { PrismaClient } = require("../generated/prisma");
-const prismaClient = new PrismaClient();
+import { prismaClient } from "./index";
 
 const seedData = {
     teacher: {

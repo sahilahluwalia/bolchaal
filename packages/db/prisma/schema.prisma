@@ -1,6 +1,9 @@
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
+  engineType = "client"
+  binaryTargets = ["native", "linux-musl","rhel-openssl-3.0.x","linux-musl-arm64-openssl-3.0.x","linux-musl-arm64-openssl-1.1.x","linux-musl-openssl-3.0.x","linux-musl"]
+  // binaryTargets = ["native", "linux-arm64-openssl-3.0.x", "linux-musl-arm64-openssl-3.0.x","rhel-openssl-3.0.x","linux-musl", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -41,8 +44,6 @@ model User {
   password       String
   name           String?
   role           UserRole  @default(TEACHER)
-  refreshToken   String?
-  refreshTokenExpiresAt DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
