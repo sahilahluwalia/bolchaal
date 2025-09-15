@@ -95,3 +95,7 @@ Required variables:
 - `REDIS_URL`
 - `JWT_SECRET`
 - `AI_GATEWAY_API_KEY`
+
+The main prompt templates for AI features are located in `packages/common-utils/prompt.ts`.  
+These prompts are currently generated using Gemini and are still being improved.  
+If you need to add or update a prompt, please edit or add a file in that directory. 📄
