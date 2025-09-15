@@ -7,6 +7,10 @@ services:
       - 3000:3000
     env_file:
       - ./apps/web/.env
+    environment:
+      - NEXT_PUBLIC_BASE_URL=http://localhost:3000
+      - NEXT_PUBLIC_API_URL=http://localhost:3005
+      - NEXT_PUBLIC_WS_URL=ws://localhost:3006
     depends_on:
       - backend
       - bullmq
@@ -18,9 +22,11 @@ services:
       dockerfile: docker/Dockerfile.backend
     ports:
       - 3005:3005
+      - 3006:3006
     env_file:
       - ./apps/backend/.env
     environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/localdb
       - REDIS_URL=redis://:redis123@redis:6379
     networks:
       - app-network
@@ -31,11 +37,10 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile.bullmq
-    ports:
-      - 3006:3006
     env_file:
       - ./apps/bullmq/.env
     environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/localdb
       - REDIS_URL=redis://:redis123@redis:6379
     depends_on:
       - redis

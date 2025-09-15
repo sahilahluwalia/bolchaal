@@ -1,6 +1,6 @@
 FROM node:lts-alpine AS builder
 
-ARG DB_URL
+
 # // for tailwind build
 # ENV NODE_ENV=development
 
@@ -15,12 +15,19 @@ COPY ./apps/backend ./apps/backend
 COPY ./apps/bullmq ./apps/bullmq
 # COPY . .
 
-RUN apk add --no-cache openssl  libc6-compat
 
 RUN pnpm install --frozen-lockfile
 # RUN pnpm turbo build --filter=web
-RUN pnpm run db:generate
-RUN pnpm run build
+# Do not bake env; Prisma generate does not require a live DB connection
+# RUN pnpm run install && pnpm run db:generate
+RUN cd packages/db && pnpm install && pnpm run db:generate && ls -la
+# RUN cd package/db/ && RUN find . -type f
+# RUN ls -la
+# RUN cat .env
+# RUN pnpm run build
+
+
+
 # RUN pnpm run build --filter=@repo/backend
 # COPY apps/web/package.json ./package.json
 
@@ -30,12 +37,19 @@ RUN pnpm run build
 # WORKDIR /
 
 # WORKDIR /
-WORKDIR /user/src/app/apps/backend
 COPY ./apps/backend/package.json ./apps/backend/package.json
+
+WORKDIR /user/src/app/apps/backend
 # // console.log currrent dir
+RUN ls -la
+# RUN cat .env
+RUN pnpm install
 RUN pnpm run build
+
+# RUN pnpm run build
 # RUN pnpm run build 
 
 EXPOSE 3005
+EXPOSE 3006
 # pnpm -w run start:backend
 CMD ["pnpm","-w","run","start:backend"]
