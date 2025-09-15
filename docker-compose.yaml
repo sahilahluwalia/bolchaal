@@ -1,6 +1,6 @@
 services:
   web:
-    image: ggoneman/bolchaal-web:latest
+    image: ggoneman/bolchaal-web
     ports:
       - 3000:3000
     env_file:
@@ -15,7 +15,7 @@ services:
     networks:
       - app-network
   backend:
-    image: ggoneman/bolchaal-backend:latest
+    image: ggoneman/bolchaal-backend
     ports:
       - 3005:3005
       - 3006:3006
@@ -30,7 +30,7 @@ services:
       - postgres
       - redis
   bullmq:
-    image: ggoneman/bolchaal-bullmq:latest
+    image: ggoneman/bolchaal-bullmq
     env_file:
       - ./apps/bullmq/.env
     environment:
