@@ -55,7 +55,7 @@ services:
       - POSTGRES_USER=postgres
       - POSTGRES_DB=localdb
     ports:
-      - "5432:5432"
+      # - "5432:5432" // dont expose this port
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
