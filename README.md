@@ -3,6 +3,8 @@
 A platform where teachers create classrooms and rubrics, and students engage in chat or audio conversations with bots to practice, improve, and get feedback on English.
 
 
+Since it uses WebSockets and a long task queue in redis and bullMQ, it requires a VPS for deployment rather than a serverless architecture. There’s currently no deployed link available, please refer to the [demo](https://www.youtube.com/watch?v=d_BsQHk9_o0) instead.
+
 ## Main Scalable AI generation Text/Audio Pipeline
 ![Main Scalable AI generation Text/Audio Pipeline](docs/scalable-backend.png)
 
