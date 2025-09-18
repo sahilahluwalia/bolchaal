@@ -6,9 +6,9 @@ services:
     env_file:
       - ./apps/web/.env
     # environment:
-    #   - NEXT_PUBLIC_BASE_URL=https://jinso-clone.sahilahluwalia.com
-    #   - NEXT_PUBLIC_API_URL=https://jinso-clone.sahilahluwalia.com/api
-    #   - NEXT_PUBLIC_WS_URL=wss://jinso-clone.sahilahluwalia.com/ws
+    #   - NEXT_PUBLIC_BASE_URL=https://bolchaal.sahilahluwalia.com
+    #   - NEXT_PUBLIC_API_URL=https://bolchaal.sahilahluwalia.com/api
+    #   - NEXT_PUBLIC_WS_URL=wss://bolchaal.sahilahluwalia.com/ws
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     depends_on:

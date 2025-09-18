@@ -1,8 +1,8 @@
-jinso-clone.sahilahluwalia.com {
-	redir https://www.jinso-clone.sahilahluwalia.com{uri}
+bolchaal.sahilahluwalia.com {
+	redir https://www.bolchaal.sahilahluwalia.com{uri}
 }
 
-www.jinso-clone.sahilahluwalia.com {
+www.bolchaal.sahilahluwalia.com {
 	encode zstd gzip
 
 	@websocket {
