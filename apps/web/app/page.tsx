@@ -29,7 +29,7 @@ export default function Page() {
         <div className="relative mx-auto max-w-7xl px-6 py-20 sm:py-24 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
             <div>
-              <p className="inline-block rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-100">Your friendly neighborhood Jinso clone</p>
+              <p className="inline-block rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-100">Your friendly neighborhood English coach</p>
               <h1 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
                 BolChaal, Learn by speaking, guided by your teacher
               </h1>
